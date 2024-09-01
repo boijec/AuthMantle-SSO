@@ -1,0 +1,19 @@
+{{ block "index" . }}
+{{ template "start" . }}
+<div class="">
+    <div class="flex flex-col items-center justify-center h-full">
+        <div class="min-w-[345px] min-h-[485px] bg-white rounded-md shaddow-lg p-[34px]">
+            {{ template "pageHeader" . }}
+            <div class="text-center">
+                <p>AuthMantle landing page</p>
+                <p>Running with &lt;HTMX/&gt; and Go</p>
+                <hr class="my-[50px]" />
+                <p class="font-bold italic">Made by:</p>
+                <p class="italic">Carl "Callback" Boije</p>
+            </div>
+        </div>
+        {{template "footer" .}}
+    </div>
+</div>
+{{ template "end" . }}
+{{ end }}

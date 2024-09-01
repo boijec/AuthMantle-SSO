@@ -1,0 +1,29 @@
+{{ block "login" .}}
+<html>
+    {{template "head" .}}
+    <body class="bg-slate-300">
+        <div id="main_container">
+            <div class="">
+                <div class="flex flex-col items-center justify-center h-full">
+                    <div class="min-w-[345px] min-h-[485px] bg-white rounded-md shaddow-lg p-[34px]">
+                        {{ template "pageHeader" . }}
+                        <form method="POST" aciton="/login" class="flex flex-col justify-between mt-3 space-y-4">
+                            <div class="flex flex-col">
+                                <label for="username">Username</label>
+                                <input type="text" name="username" placeholder="Username" class="py-[10px] px-2 rounded-sm bg-slate-100" />
+                            </div>
+                            <div class="flex flex-col">
+                                <label for="password">Password</label>
+                                <input type="password" name="password" placeholder="Password" class="py-[10px] px-2 rounded-sm bg-slate-100" />
+                            </div>
+                            <input type="submit" value="Login" class="mt-5 px-4 py-2 bg-blue-500 text-white rounded-md" />
+                            <a href="/register" class="mt-5 px-4 py-2 bg-blue-500 text-white rounded-md text-center">Register</a>
+                        </form>
+                    </div>
+                    {{template "footer" .}}
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
+{{ end }}

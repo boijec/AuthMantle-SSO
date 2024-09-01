@@ -1,0 +1,15 @@
+{{ block "admin_panel" . }}
+{{ template "start" . }}
+<div class="">
+    <div class="flex flex-col items-center justify-center h-full">
+        <div class="min-w-[345px] min-h-[485px] bg-white rounded-md shaddow-lg p-[34px]">
+            {{ template "pageHeader" . }}
+            <div class="text-center">
+                <p>Logged In Admin</p>
+            </div>
+        </div>
+        {{template "footer" .}}
+    </div>
+</div>
+{{ template "end" . }}
+{{ end }}
