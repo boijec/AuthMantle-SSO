@@ -56,6 +56,7 @@ type EndpointHelper struct {
 	FunctionPTR func(w http.ResponseWriter, r *http.Request)
 }
 
+// thank FUCK for globals - but this needs some more thought
 var ConfiguredRoutes = map[string]EndpointHelper{
 	"jwks":  {"GET", "/.well-known/jwks.json", HandleJWKs},
 	"auth":  {"POST", "/authorize", HandleAuth},
@@ -64,7 +65,7 @@ var ConfiguredRoutes = map[string]EndpointHelper{
 
 func HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	wk := new(WellKnownResponse)
+	wk := new(WellKnownResponse) // temporary retardation.. TODO remove this shit
 	err := json.NewEncoder(w).Encode(wk)
 	if err != nil {
 		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
@@ -91,7 +92,7 @@ func HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 
 func HandleJWKs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	jwkList := make([]JWK, 2)
+	jwkList := make([]JWK, 2) // TODO remove and actually parse some keys
 	jwk := JWKResponse{Keys: &jwkList}
 	defer func() {
 		jwkList = nil // power to the ppl bby
@@ -104,6 +105,7 @@ func HandleJWKs(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleNewToken(w http.ResponseWriter, r *http.Request) {
+	// for good results load from db, for best results hard code the shit out of it? TODO check if this can be dynamically checked (support more than form data)
 	req := &AuthRequest{
 		GrantType:   r.FormValue("grant_type"),
 		Code:        r.FormValue("code"),
@@ -132,5 +134,5 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 
 func HandleAuth(w http.ResponseWriter, r *http.Request) {
 	redir := r.URL.Query().Get("redirect_uri")
-	http.Redirect(w, r, fmt.Sprintf("%s?code=%s", redir, "dudde1234"), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("%s?code=%s", redir, "dudde1234"), http.StatusSeeOther) // hehe, stupid shit going down right here ;)
 }

@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+// TODO reformat to not have the entire universe in main - rule #1 of weekend-warrioring: don't be horny on main!
+
 func main() {
 	mainMiddleware := middleware.RegisterMiddlewares(
 		middleware.RequestLogging,

@@ -6,6 +6,8 @@ import (
 	"strconv"
 )
 
+// TODO yeah, make Page and MetaData more efficient this shouldn't be *that* hard
+
 type Page struct {
 	PageMeta   MetaData
 	StatusCode int
