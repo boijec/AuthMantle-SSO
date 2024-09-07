@@ -53,7 +53,7 @@ func loadKey(location string) error {
 GetSigningKey returns the private key used to sign tokens
 
 If the key has not been loaded, it will load it from the default location
-`.keys/tokenSigner`
+`.keys/tokenSigner` or create an in-memory key if the file does not exist
 */
 func GetSigningKey() (*ecdsa.PrivateKey, error) {
 	if loadedPrivateKey == nil {
