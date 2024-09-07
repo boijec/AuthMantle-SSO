@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"html/template"
 	"log"
 	"net/http"
@@ -30,9 +31,16 @@ func RegisterMiddlewares(m ...Middleware) Middleware {
 	}
 }
 
+const RequestIDContextKey ContextKey = "user_session"
+
 func RequestLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Request: %s %s\n", r.Method, r.URL.Path)
+		ctx := r.Context()
+		id := uuid.New()
+		ctx = context.WithValue(ctx, RequestIDContextKey, id.String())
+		r = r.WithContext(ctx)
+
+		log.Printf("Incoming request [%s]: %s %s\n", id.String(), r.Method, r.URL.Path)
 		s := time.Now()
 		responseWrapper := &ResponseWrapper{
 			ResponseWriter: w,
@@ -40,7 +48,7 @@ func RequestLogging(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(responseWrapper, r)
 		// TODO change to correlation id MW, when the request throws an error, this is dumb..
-		log.Printf("Request (%d) %s %s finished in %v\n", responseWrapper.status, r.Method, r.URL.Path, time.Since(s))
+		log.Printf("Finished request [%s] with (%d) %s %s in %v\n", id.String(), responseWrapper.status, r.Method, r.URL.Path, time.Since(s))
 	})
 }
 

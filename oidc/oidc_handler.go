@@ -1,14 +1,12 @@
 package oidc
 
 import (
-	"crypto/x509"
+	"authmantle-sso/jwk"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"log"
 	"net/http"
-	"os"
 )
 
 type WellKnownResponse struct {
@@ -28,24 +26,14 @@ type WellKnownResponse struct {
 	ClaimsSupported                   []string `json:"claims_supported"`
 	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
 }
-type JWKResponse struct {
-	Keys *[]JWK `json:"keys"`
-}
-type JWK struct {
-	Kid string    `json:"kid"`
-	Kty string    `json:"kty"`
-	Alg string    `json:"alg"`
-	Use string    `json:"use"`
-	N   string    `json:"n"`
-	E   string    `json:"e"`
-	X5t string    `json:"x5t"`
-	X5c [1]string `json:"x5c"`
+type JWKResponse[T any] struct {
+	Keys *[]T `json:"keys"`
 }
 
 type AuthRequest struct {
-	GrantType   string
-	Code        string
-	RedirectUri string
+	GrantType   string `json:"grant_type"`
+	Code        string `json:"code"`
+	RedirectUri string `json:"redirect_uri"`
 }
 type AuthResponse struct {
 	AccessToken *string `json:"access_token"`
@@ -60,8 +48,8 @@ type EndpointHelper struct {
 	FunctionPTR func(w http.ResponseWriter, r *http.Request)
 }
 
-// thank FUCK for globals - but this needs some more thought
-var ConfiguredRoutes = map[string]EndpointHelper{
+// ConfiguredRoutes global map of configured routes for OIDC discovery
+var ConfiguredRoutes = map[string]*EndpointHelper{
 	"jwks":  {"GET", "/.well-known/jwks.json", HandleJWKs},
 	"auth":  {"POST", "/authorize", HandleAuth},
 	"token": {"POST", "/oauth/token.json", HandleNewToken},
@@ -84,53 +72,94 @@ func HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 		"jwks_uri": "http://localhost:8080/v1/jwks.json",
 		"scopes_supported": ["openid", "profile", "email"],
 		"response_types_supported": ["code"],
-		"response_modes_supported": ["query", "fragment"],
 		"grant_types_supported": ["authorization_code"],
 		"subject_types_supported": ["public"],
-		"id_token_signing_alg_values_supported": ["RS256"],
-		"token_endpoint_auth_methods_supported": ["client_secret_basic"],
-		"claims_supported": ["sub", "iss", "email", "profile"],
-		"code_challenge_methods_supported": ["plain", "S256"]
+		"id_token_signing_alg_values_supported": ["ES256"],
+		"claims_supported": ["sub", "iss", "email", "profile"]
 	*/
 }
 
 func HandleJWKs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	jwkList := make([]JWK, 2) // TODO remove and actually parse some keys
-	jwk := JWKResponse{Keys: &jwkList}
+	jwkList := make([]jwk.ECJwk, 1) // TODO remove and actually parse some keys
 	defer func() {
 		jwkList = nil // power to the ppl bby
 	}()
-	err := json.NewEncoder(w).Encode(jwk)
+	privateKey, err := jwk.GetSigningKey()
+	if err != nil {
+		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		return
+	}
+	jwkList[0] = jwk.ECJwk{
+		Kty: "EC",
+		Crv: "P-256",
+		X:   fmt.Sprintf("%x", privateKey.X),
+		Y:   fmt.Sprintf("%x", privateKey.Y),
+		D:   fmt.Sprintf("%x", privateKey.D),
+	}
+	j := JWKResponse[jwk.ECJwk]{Keys: &jwkList}
+	err = json.NewEncoder(w).Encode(j)
 	if err != nil {
 		http.Error(w, "Failed to encode jwkList", http.StatusInternalServerError)
 		return
 	}
 }
 
+type ContentTypeParser interface {
+	ParseContent(s string, v *http.Request) error
+}
+
+func (ar *AuthRequest) ParseContent(contentType string, req *http.Request) error {
+	if req == nil {
+		return fmt.Errorf("nil reference for Request")
+	}
+	if contentType == "" {
+		return fmt.Errorf("empty Content-Type header")
+	}
+	switch contentType {
+	case "application/x-www-form-urlencoded":
+		ar.GrantType = req.FormValue("grant_type")
+		ar.Code = req.FormValue("code")
+		ar.RedirectUri = req.FormValue("redirect_uri")
+	case "application/json":
+		err := json.NewDecoder(req.Body).Decode(ar)
+		if err != nil {
+			return fmt.Errorf("failed to decode json body: %v", err)
+		}
+	default:
+		return fmt.Errorf("unsupported Content-Type header")
+	}
+	return nil
+}
+
 func HandleNewToken(w http.ResponseWriter, r *http.Request) {
-	// for good results load from db, for best results hard code the shit out of it? TODO check if this can be dynamically checked (support more than form data)
-	req := &AuthRequest{
-		GrantType:   r.FormValue("grant_type"),
-		Code:        r.FormValue("code"),
-		RedirectUri: r.FormValue("redirect_uri"),
+	req := new(AuthRequest)
+	defer func() {
+		req = nil
+	}()
+	err := req.ParseContent(r.Header.Get("Content-Type"), r)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to parse request", http.StatusInternalServerError)
+		return
 	}
 	log.Println(req)
+	// TODO validate grant_type, scopes, code and redirect_uri(again)
 
 	res := &AuthResponse{
 		Scope:     "openid profile email",
 		ExpiresIn: 86400,
 		TokenType: "Bearer",
 	}
-	bytes, err := os.ReadFile("./.keys/tokenSigner")
-	block, _ := pem.Decode(bytes)
-	privateKey, err := x509.ParseECPrivateKey(block.Bytes)
-
+	// TODO replace with fetch from globally loaded key
+	// TODO cleanup
+	privateKey, err := jwk.GetSigningKey()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
 		return
 	}
+
 	idToken := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
 		"foo": "idToken",
 	})
@@ -140,7 +169,11 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		res.IdToken = &token
+		idToken = nil
 	}
+	defer func() {
+		res.IdToken = nil
+	}()
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
 		"foo": "accessToken",
 	})
@@ -150,7 +183,11 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		res.AccessToken = &token
+		accessToken = nil
 	}
+	defer func() {
+		res.AccessToken = nil
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Status", "200 OK")
@@ -159,11 +196,13 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
 		return
 	}
-	// should respond with
-	// 	"{"access_token": "accessToken","id_token":"idToken","scope":"openid profile email","expires_in":86400,"token_type":"Bearer"}
 }
 
 func HandleAuth(w http.ResponseWriter, r *http.Request) {
+	// TODO check if this is a valid user or return error html
+	log.Println(r.FormValue("username"), r.FormValue("password"))
+	// TODO check if this is a configured redirect_uri
 	redir := r.URL.Query().Get("redirect_uri")
+	// TODO create a auth_code_request and store it in the db
 	http.Redirect(w, r, fmt.Sprintf("%s?code=%s", redir, "dudde1234"), http.StatusSeeOther) // hehe, stupid shit going down right here ;)
 }
