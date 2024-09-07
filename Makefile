@@ -17,7 +17,7 @@ test:
 	go test -v ./...
 
 bench:
-	go test -v ./... -bench=. -benchmem -count 5
+	go test -v ./... -bench=. -benchmem
 
 # run_hc: $(HC_NAME)
 # 	./$(HC_NAME)
