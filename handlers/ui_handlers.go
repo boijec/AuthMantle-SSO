@@ -11,6 +11,7 @@ import (
 type Page struct {
 	PageMeta   MetaData
 	StatusCode int
+	Error      string
 }
 type MetaData struct {
 	PageTitle string

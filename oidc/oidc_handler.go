@@ -1,7 +1,11 @@
 package oidc
 
 import (
+	"authmantle-sso/data"
+	"authmantle-sso/handlers"
 	"authmantle-sso/jwk"
+	"authmantle-sso/middleware"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
@@ -199,10 +203,58 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleAuth(w http.ResponseWriter, r *http.Request) {
-	// TODO check if this is a valid user or return error html
-	log.Println(r.FormValue("username"), r.FormValue("password"))
+	tplCtx := r.Context().Value(middleware.TemplateContextKey).(*middleware.Templates)
+	connection, err := data.GetFetcher().Acquire(context.Background())
+	defer func() {
+		connection.Release()
+	}()
+	if err != nil {
+		err = tplCtx.Render(w, "login.html", handlers.Page{
+			PageMeta: handlers.MetaData{PageTitle: "Login"},
+			Error:    "Internal Server Error",
+		})
+		if err != nil {
+			log.Printf("Failed to render login page: %v", err)
+		}
+		return
+	}
+	user := new(data.User)
+	err = user.GetUser(connection, r.FormValue("username"))
+	if err != nil {
+		err = tplCtx.Render(w, "login.html", handlers.Page{
+			PageMeta: handlers.MetaData{PageTitle: "Login"},
+			Error:    "Invalid Password or Username",
+		})
+		if err != nil {
+			log.Printf("Failed to render login page: %v", err)
+		}
+		return
+	}
+	if user.Password != r.FormValue("password") {
+		err = tplCtx.Render(w, "login.html", handlers.Page{
+			PageMeta: handlers.MetaData{PageTitle: "Login"},
+			Error:    "Invalid Password or Username",
+		})
+		if err != nil {
+			log.Printf("Failed to render login page: %v", err)
+		}
+		return
+	}
 	// TODO check if this is a configured redirect_uri
 	redir := r.URL.Query().Get("redirect_uri")
 	// TODO create a auth_code_request and store it in the db
-	http.Redirect(w, r, fmt.Sprintf("%s?code=%s", redir, "dudde1234"), http.StatusSeeOther) // hehe, stupid shit going down right here ;)
+	authReq := new(data.AuthCodeRequest)
+	err = authReq.CreateAuthCodeRequest(connection, user.ID)
+	if err != nil {
+		log.Println(err)
+		err = tplCtx.Render(w, "login.html", handlers.Page{
+			PageMeta: handlers.MetaData{PageTitle: "Login"},
+			Error:    "Auth code error, please try again later",
+		})
+		if err != nil {
+			log.Printf("Failed to render login page: %v", err)
+		}
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("%s?code=%s", redir, authReq.AuthCode), http.StatusSeeOther) // hehe, stupid shit going down right here ;)
 }

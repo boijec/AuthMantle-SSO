@@ -1,6 +1,7 @@
 package main
 
 import (
+	"authmantle-sso/data"
 	"authmantle-sso/handlers"
 	"authmantle-sso/middleware"
 	"authmantle-sso/oidc"
@@ -16,6 +17,7 @@ import (
 // TODO reformat to not have the entire universe in main - rule #1 of weekend-warrioring: don't be horny on main!
 
 func main() {
+	data.InitializePool()
 	mainMiddleware := middleware.RegisterMiddlewares(
 		middleware.RequestLogging,
 		middleware.RenderTemplateContext,
