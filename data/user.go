@@ -86,3 +86,35 @@ func (arc *AuthCodeRequest) CreateAuthCodeRequest(connection *pgxpool.Conn, user
 	}
 	return nil
 }
+
+func (arc *AuthCodeRequest) GetAuthCodeRequest(connection *pgxpool.Conn, code string) error {
+	row := connection.QueryRow(
+		context.Background(),
+		"SELECT * FROM authmantledb.in_auth_code_requests WHERE auth_code = $1",
+		code,
+	)
+	err := row.Scan(
+		&arc.ID,
+		&arc.UserID,
+		&arc.AuthCode,
+		&arc.ValidUntil,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func CheckRedirectURI(connection *pgxpool.Conn, uri string) (bool, error) {
+	row := connection.QueryRow(
+		context.Background(),
+		"SELECT u.redirect_uri FROM authmantledb.in_supp_auth_allowed_redirects u WHERE redirect_uri = $1",
+		uri,
+	)
+	var redir string
+	err := row.Scan(&redir)
+	if err != nil {
+		return false, err
+	}
+	return redir == uri, nil
+}

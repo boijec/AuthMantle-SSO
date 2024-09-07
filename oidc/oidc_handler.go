@@ -242,6 +242,17 @@ func HandleAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	// TODO check if this is a configured redirect_uri
 	redir := r.URL.Query().Get("redirect_uri")
+	valid, err := data.CheckRedirectURI(connection, redir)
+	if redir == "" || err != nil || !valid {
+		err = tplCtx.Render(w, "login.html", handlers.Page{
+			PageMeta: handlers.MetaData{PageTitle: "Login"},
+			Error:    "Invalid redirect_uri",
+		})
+		if err != nil {
+			log.Printf("Failed to render login page: %v", err)
+		}
+		return
+	}
 	// TODO create a auth_code_request and store it in the db
 	authReq := new(data.AuthCodeRequest)
 	err = authReq.CreateAuthCodeRequest(connection, user.ID)
