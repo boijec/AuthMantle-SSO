@@ -1,10 +1,14 @@
 package oidc
 
 import (
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"log"
 	"net/http"
+	"os"
 )
 
 type WellKnownResponse struct {
@@ -44,11 +48,11 @@ type AuthRequest struct {
 	RedirectUri string
 }
 type AuthResponse struct {
-	AccessToken string `json:"access_token"`
-	IdToken     string `json:"id_token"`
-	Scope       string `json:"scope"`
-	ExpiresIn   int    `json:"expires_in"`
-	TokenType   string `json:"token_type"`
+	AccessToken *string `json:"access_token"`
+	IdToken     *string `json:"id_token"`
+	Scope       string  `json:"scope"`
+	ExpiresIn   int     `json:"expires_in"`
+	TokenType   string  `json:"token_type"`
 }
 type EndpointHelper struct {
 	Method      string
@@ -118,12 +122,39 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		ExpiresIn: 86400,
 		TokenType: "Bearer",
 	}
-	res.AccessToken = "accessToken"
-	res.IdToken = "idToken"
+	bytes, err := os.ReadFile("./.keys/tokenSigner")
+	block, _ := pem.Decode(bytes)
+	privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		return
+	}
+	idToken := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
+		"foo": "idToken",
+	})
+	if token, err := idToken.SignedString(privateKey); err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		return
+	} else {
+		res.IdToken = &token
+	}
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
+		"foo": "accessToken",
+	})
+	if token, err := accessToken.SignedString(privateKey); err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		return
+	} else {
+		res.AccessToken = &token
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Status", "200 OK")
-	err := json.NewEncoder(w).Encode(res)
+	err = json.NewEncoder(w).Encode(res)
 	if err != nil {
 		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
 		return

@@ -32,6 +32,7 @@ func RegisterMiddlewares(m ...Middleware) Middleware {
 
 func RequestLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Request: %s %s\n", r.Method, r.URL.Path)
 		s := time.Now()
 		responseWrapper := &ResponseWrapper{
 			ResponseWriter: w,
@@ -39,7 +40,7 @@ func RequestLogging(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(responseWrapper, r)
 		// TODO change to correlation id MW, when the request throws an error, this is dumb..
-		log.Printf("Request Finished in %v: (%d) %s %s\n", time.Since(s), responseWrapper.status, r.Method, r.URL.Path)
+		log.Printf("Request (%d) %s %s finished in %v\n", responseWrapper.status, r.Method, r.URL.Path, time.Since(s))
 	})
 }
 

@@ -20,10 +20,6 @@ func main() {
 		middleware.RequestLogging,
 		middleware.RenderTemplateContext,
 	)
-	cM := middleware.RegisterMiddlewares(middleware.EnsureSession)
-	adnM := middleware.RegisterMiddlewares(
-		middleware.AdminLock,
-	)
 
 	openRouter := http.NewServeMux()
 	adminRouter := http.NewServeMux()
@@ -57,8 +53,8 @@ func main() {
 
 	router := http.NewServeMux()
 	router.Handle("/v1/", http.StripPrefix("/v1", openRouter))
-	router.Handle("/protected/", http.StripPrefix("/protected", cM(closedRouter)))
-	router.Handle("/adm_console/", http.StripPrefix("/adm_console", adnM(adminRouter)))
+	router.Handle("/protected/", http.StripPrefix("/protected", middleware.EnsureSession(closedRouter)))
+	router.Handle("/adm_console/", http.StripPrefix("/adm_console", middleware.AdminLock(adminRouter)))
 	router.Handle("/adm_login/", http.StripPrefix("/adm_login", adminOpenRouter))
 	router.Handle("GET /admin/console", http.RedirectHandler("/adm_console/", http.StatusSeeOther))
 

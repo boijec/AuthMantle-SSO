@@ -1,3 +1,6 @@
 tmp/
-db_data/
+.db/data/
 .idea/
+.keys/*
+!.keys/keepme.md
+!.keys/main.go
