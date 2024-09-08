@@ -224,27 +224,27 @@ VALUES
     (nextval('us_role_id_seq'), 'user', 'User', NOW(), 'default_SQL', NOW(), 'default_SQL');
 
 -- remove later -- is essentially invalid
-INSERT INTO authmantledb.in_supp_auth_audience (id,audience_name)
+INSERT INTO authmantledb.in_supp_auth_audience (id,audience)
 VALUES (nextval('in_supp_auth_audience_id_seq'),'https://some-website.dudde.com');
 INSERT INTO authmantledb.in_supp_auth_allowed_redirects (id,redirect_uri)
 VALUES (nextval('in_supp_auth_allowed_redirects_id_seq'), 'http://localhost:3000');
 -- remove later
 
-INSERT INTO authmantledb.in_supp_auth_grant_types (id,grant_type_name)
+INSERT INTO authmantledb.in_supp_auth_grant_types (id,grant_type)
 VALUES (nextval('in_supp_auth_grant_types_id_seq'),'authorization_code');
 
-INSERT INTO authmantledb.in_supp_auth_scopes (id,scope_name)
+INSERT INTO authmantledb.in_supp_auth_scopes (id,scope)
 VALUES (nextval('in_supp_auth_scopes_id_seq'),'openid'),
        (nextval('in_supp_auth_scopes_id_seq'),'profile'),
        (nextval('in_supp_auth_scopes_id_seq'),'email');
 
-INSERT INTO authmantledb.in_supp_auth_claims (id,claim_name)
+INSERT INTO authmantledb.in_supp_auth_claims (id,claim)
 VALUES (nextval('in_supp_auth_claims_id_seq'),'sub'),
        (nextval('in_supp_auth_claims_id_seq'),'iss'),
        (nextval('in_supp_auth_claims_id_seq'),'email'),
        (nextval('in_supp_auth_claims_id_seq'),'profile');
 
-INSERT INTO authmantledb.in_supp_auth_subject_types (id,subject_type_name)
+INSERT INTO authmantledb.in_supp_auth_subject_types (id,subject_type)
 VALUES (nextval('in_supp_auth_subject_types_id_seq'),'public');
 
 

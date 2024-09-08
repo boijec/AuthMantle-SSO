@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"log"
 	"os"
+	"sync"
 )
 
 type ECJwk struct {
@@ -18,13 +19,24 @@ type ECJwk struct {
 	D   string `json:"d"`
 }
 
-var loadedPrivateKey *ecdsa.PrivateKey
+type LoadedKey struct {
+	lock sync.Mutex
+	key  *ecdsa.PrivateKey
+}
+
+var loadedPrivateKey *LoadedKey
 
 func loadKey(location string) error {
+	loadedPrivateKey = new(LoadedKey)
+	loadedPrivateKey.lock = sync.Mutex{}
+	loadedPrivateKey.lock.Lock()
+	defer func() {
+		loadedPrivateKey.lock.Unlock()
+	}()
+
 	pkey := new(ecdsa.PrivateKey)
 	bytes, err := os.ReadFile(location)
 	if err != nil {
-		log.Println("Could not load private key, generating in-memory key")
 		pkey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
 			return err
@@ -44,7 +56,7 @@ func loadKey(location string) error {
 	if err != nil {
 		return err
 	}
-	loadedPrivateKey = pkey
+	loadedPrivateKey.key = pkey
 	log.Println("Loaded private key")
 	return nil
 }
@@ -62,5 +74,7 @@ func GetSigningKey() (*ecdsa.PrivateKey, error) {
 			return nil, err
 		}
 	}
-	return loadedPrivateKey, nil
+	loadedPrivateKey.lock.Lock()
+	defer loadedPrivateKey.lock.Unlock()
+	return loadedPrivateKey.key, nil
 }

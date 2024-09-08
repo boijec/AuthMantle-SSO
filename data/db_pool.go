@@ -3,12 +3,20 @@ package data
 import (
 	"context"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"log"
+	"log/slog"
 	"time"
 )
 
 var fetcher *pgxpool.Pool
+
+// DbActions interface that the "pgx" library implements (to make it easier to test)
+type DbActions interface {
+	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
 
 func GetFetcher() *pgxpool.Pool {
 	return fetcher
@@ -17,7 +25,7 @@ func GetFetcher() *pgxpool.Pool {
 func InitializePool() {
 	pool, err := pgxpool.NewWithConfig(context.Background(), configure())
 	if err != nil {
-		log.Fatal("Error while creating connection to the database!!")
+		slog.Error("Error while creating connection to the database", "error", err)
 	}
 	fetcher = pool
 }
@@ -30,12 +38,12 @@ func configure() *pgxpool.Config {
 	const defaultHealthCheckPeriod = time.Minute
 	const defaultConnectTimeout = time.Second * 5
 
-	// Your own Database URL
+	// TODO export to env
 	const DATABASE_URL string = "postgres://auth_mantle_manager:dudde@localhost:5432/authmantledb?"
 
 	dbConfig, err := pgxpool.ParseConfig(DATABASE_URL)
 	if err != nil {
-		log.Fatal("Failed to create a config, error: ", err)
+		slog.Error("Failed to create a config, error: ", "error", err)
 	}
 
 	dbConfig.MaxConns = defaultMaxConns
@@ -46,17 +54,17 @@ func configure() *pgxpool.Config {
 	dbConfig.ConnConfig.ConnectTimeout = defaultConnectTimeout
 
 	dbConfig.BeforeAcquire = func(ctx context.Context, c *pgx.Conn) bool {
-		log.Println("Before acquiring the connection pool to the database!!")
+		slog.DebugContext(ctx, "Acquiring connection from pool")
 		return true
 	}
 
 	dbConfig.AfterRelease = func(c *pgx.Conn) bool {
-		log.Println("After releasing the connection pool to the database!!")
+		slog.Debug("Released connection to the pool")
 		return true
 	}
 
 	dbConfig.BeforeClose = func(c *pgx.Conn) {
-		log.Println("Closed the connection pool to the database!!")
+		slog.Debug("Closed DB connection")
 	}
 
 	return dbConfig

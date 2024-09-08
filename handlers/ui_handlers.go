@@ -25,10 +25,6 @@ func GetLandingPage(w http.ResponseWriter, r *http.Request) {
 	tplCtx := r.Context().Value(middleware.TemplateContextKey).(*middleware.Templates)
 	tplCtx.Render(w, "index.html", Page{PageMeta: MetaData{PageTitle: "Login"}})
 }
-func GetLoginPage(w http.ResponseWriter, r *http.Request) {
-	tplCtx := r.Context().Value(middleware.TemplateContextKey).(*middleware.Templates)
-	tplCtx.Render(w, "login.html", Page{PageMeta: MetaData{PageTitle: "Login"}})
-}
 func GetRegisterPage(w http.ResponseWriter, r *http.Request) {
 	tplCtx := r.Context().Value(middleware.TemplateContextKey).(*middleware.Templates)
 	tplCtx.Render(w, "register.html", Page{PageMeta: MetaData{PageTitle: "Login"}})

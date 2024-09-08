@@ -7,6 +7,8 @@ import (
 	"authmantle-sso/oidc"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,13 +16,16 @@ import (
 	"time"
 )
 
-// TODO reformat to not have the entire universe in main - rule #1 of weekend-warrioring: don't be horny on main!
-
+// TODO reformat to not have the entire universe in main - rule #1 of the weekend-warrior: don't be horny in main!
 func main() {
 	data.InitializePool()
+	uuid.EnableRandPool()
 	mainMiddleware := middleware.RegisterMiddlewares(
 		middleware.RequestLogging,
 		middleware.RenderTemplateContext,
+		// TODO: this works for now, but if more than like 3 users want to log in, this is going to be a nightmare
+		// fix your shit! instantiate the handlers and inject from main!
+		middleware.InjectDbContext,
 	)
 
 	openRouter := http.NewServeMux()
@@ -42,7 +47,7 @@ func main() {
 
 	// UI registration
 	openRouter.HandleFunc("GET /register", handlers.GetRegisterPage)
-	openRouter.HandleFunc("GET /authorize", handlers.GetLoginPage)
+	openRouter.HandleFunc("GET /authorize", oidc.GetLoginPage)
 
 	openRouter.HandleFunc("GET /error/{status}", handlers.ErrorRedirect)
 	openRouter.HandleFunc("GET /", handlers.GetLandingPage)
@@ -52,6 +57,7 @@ func main() {
 	adminOpenRouter.HandleFunc("POST /", handlers.AdminLogin)
 
 	closedRouter.HandleFunc("GET /", handlers.GetUserSettings)
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 
 	router := http.NewServeMux()
 	router.Handle("/v1/", http.StripPrefix("/v1", openRouter))
@@ -61,16 +67,16 @@ func main() {
 	router.Handle("GET /admin/console", http.RedirectHandler("/adm_console/", http.StatusSeeOther))
 
 	srv := &http.Server{
-		Addr:    "localhost:8443",
+		Addr:    "localhost:8443", // TODO export to env
 		Handler: mainMiddleware(router),
 	}
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
 	signal.Notify(sigint, syscall.SIGTERM)
 	go func() {
-		fmt.Println("Server started at localhost 8443")
+		slog.Info("Server started at localhost 8443")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("Fatal error: %v\n", err)
+			slog.Error("Fatal error", "error", err)
 			os.Exit(1)
 		}
 	}()

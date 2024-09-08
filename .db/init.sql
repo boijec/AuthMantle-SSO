@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS authmantledb.in_auth_code_requests (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     auth_code UUID NOT NULL DEFAULT gen_random_uuid(),
-    valid_until TIMESTAMP NOT NULL DEFAULT NOW() + INTERVAL '1 hour',
+    valid_until TIMESTAMP NOT NULL DEFAULT NOW() + (15 * INTERVAL '1 minute'),
+    consumed INTEGER NOT NULL DEFAULT 0,
 
     FOREIGN KEY (user_id) REFERENCES authmantledb.us_user(id)
 );
@@ -99,35 +100,35 @@ GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.in_auth_code_requests_id_se
 
 CREATE TABLE IF NOT EXISTS authmantledb.in_supp_auth_audience (
     id SERIAL PRIMARY KEY,
-    audience_name VARCHAR(200) NOT NULL
+    audience VARCHAR(200) NOT NULL
 );
 GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.in_supp_auth_audience TO auth_mantle_manager;
 GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.in_supp_auth_audience_id_seq TO auth_mantle_manager;
 
 CREATE TABLE IF NOT EXISTS authmantledb.in_supp_auth_grant_types (
     id SERIAL PRIMARY KEY,
-    grant_type_name VARCHAR(200) NOT NULL
+    grant_type VARCHAR(200) NOT NULL
 );
 GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.in_supp_auth_grant_types TO auth_mantle_manager;
 GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.in_supp_auth_grant_types_id_seq TO auth_mantle_manager;
 
 CREATE TABLE IF NOT EXISTS authmantledb.in_supp_auth_scopes (
     id SERIAL PRIMARY KEY,
-    scope_name VARCHAR(200) NOT NULL
+    scope VARCHAR(200) NOT NULL
 );
 GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.in_supp_auth_scopes TO auth_mantle_manager;
 GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.in_supp_auth_scopes_id_seq TO auth_mantle_manager;
 
 CREATE TABLE IF NOT EXISTS authmantledb.in_supp_auth_claims (
     id SERIAL PRIMARY KEY,
-    claim_name VARCHAR(200) NOT NULL
+    claim VARCHAR(200) NOT NULL
 );
 GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.in_supp_auth_claims TO auth_mantle_manager;
 GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.in_supp_auth_claims_id_seq TO auth_mantle_manager;
 
 CREATE TABLE IF NOT EXISTS authmantledb.in_supp_auth_subject_types (
     id SERIAL PRIMARY KEY,
-    subject_type_name VARCHAR(200) NOT NULL
+    subject_type VARCHAR(200) NOT NULL
 );
 GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.in_supp_auth_subject_types TO auth_mantle_manager;
 GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.in_supp_auth_subject_types_id_seq TO auth_mantle_manager;

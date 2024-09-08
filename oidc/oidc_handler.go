@@ -5,11 +5,12 @@ import (
 	"authmantle-sso/handlers"
 	"authmantle-sso/jwk"
 	"authmantle-sso/middleware"
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -60,11 +61,14 @@ var ConfiguredRoutes = map[string]*EndpointHelper{
 }
 
 func HandleWellKnown(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	w.Header().Set("Content-Type", "application/json")
 	wk := new(WellKnownResponse) // temporary retardation.. TODO remove this shit
 	err := json.NewEncoder(w).Encode(wk)
 	if err != nil {
-		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		slog.ErrorContext(ctx, "Error while encoding JWKs", "error", err)
+		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	}
 	/*
@@ -91,7 +95,7 @@ func HandleJWKs(w http.ResponseWriter, r *http.Request) {
 	}()
 	privateKey, err := jwk.GetSigningKey()
 	if err != nil {
-		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	}
 	jwkList[0] = jwk.ECJwk{
@@ -137,6 +141,10 @@ func (ar *AuthRequest) ParseContent(contentType string, req *http.Request) error
 }
 
 func HandleNewToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := ctx.Value(middleware.LoggerContextKey).(*slog.Logger)
+	connection := ctx.Value(middleware.DbContextKey).(*pgxpool.Conn)
+
 	req := new(AuthRequest)
 	defer func() {
 		req = nil
@@ -147,6 +155,13 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to parse request", http.StatusInternalServerError)
 		return
 	}
+	authCode := new(data.AuthCodeRequest)
+	err = authCode.GetAuthCodeRequest(ctx, *logger, connection, req.Code)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to get auth code", http.StatusInternalServerError)
+		return
+	}
 	log.Println(req)
 	// TODO validate grant_type, scopes, code and redirect_uri(again)
 
@@ -155,12 +170,10 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		ExpiresIn: 86400,
 		TokenType: "Bearer",
 	}
-	// TODO replace with fetch from globally loaded key
-	// TODO cleanup
 	privateKey, err := jwk.GetSigningKey()
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	}
 
@@ -169,7 +182,7 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	})
 	if token, err := idToken.SignedString(privateKey); err != nil {
 		log.Println(err)
-		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	} else {
 		res.IdToken = &token
@@ -183,7 +196,7 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	})
 	if token, err := accessToken.SignedString(privateKey); err != nil {
 		log.Println(err)
-		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	} else {
 		res.AccessToken = &token
@@ -202,68 +215,64 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func HandleAuth(w http.ResponseWriter, r *http.Request) {
+func GetLoginPage(w http.ResponseWriter, r *http.Request) {
 	tplCtx := r.Context().Value(middleware.TemplateContextKey).(*middleware.Templates)
-	connection, err := data.GetFetcher().Acquire(context.Background())
-	defer func() {
-		connection.Release()
-	}()
-	if err != nil {
-		err = tplCtx.Render(w, "login.html", handlers.Page{
-			PageMeta: handlers.MetaData{PageTitle: "Login"},
-			Error:    "Internal Server Error",
-		})
-		if err != nil {
-			log.Printf("Failed to render login page: %v", err)
-		}
-		return
-	}
+	tplCtx.Render(w, "login.html", handlers.Page{PageMeta: handlers.MetaData{PageTitle: "Login"}})
+}
+
+func HandleAuth(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := ctx.Value(middleware.LoggerContextKey).(*slog.Logger)
+	tplCtx := ctx.Value(middleware.TemplateContextKey).(*middleware.Templates)
+	connection := ctx.Value(middleware.DbContextKey).(*pgxpool.Conn)
+
 	user := new(data.User)
-	err = user.GetUser(connection, r.FormValue("username"))
+	err := user.GetUser(ctx, *logger, connection, r.FormValue("username"))
 	if err != nil {
+		logger.InfoContext(ctx, "User not found", "username", r.FormValue("username"))
 		err = tplCtx.Render(w, "login.html", handlers.Page{
 			PageMeta: handlers.MetaData{PageTitle: "Login"},
 			Error:    "Invalid Password or Username",
 		})
 		if err != nil {
-			log.Printf("Failed to render login page: %v", err)
+			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
 		}
 		return
 	}
 	if user.Password != r.FormValue("password") {
+		logger.WarnContext(ctx, "User's credentials did not match!", "username", r.FormValue("username"))
 		err = tplCtx.Render(w, "login.html", handlers.Page{
 			PageMeta: handlers.MetaData{PageTitle: "Login"},
 			Error:    "Invalid Password or Username",
 		})
 		if err != nil {
-			log.Printf("Failed to render login page: %v", err)
+			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
 		}
 		return
 	}
-	// TODO check if this is a configured redirect_uri
 	redir := r.URL.Query().Get("redirect_uri")
-	valid, err := data.CheckRedirectURI(connection, redir)
+	valid, err := data.CheckRedirectURI(ctx, *logger, connection, redir)
 	if redir == "" || err != nil || !valid {
+		logger.ErrorContext(ctx, "Invalid redirect_uri", "redirect_uri", redir)
 		err = tplCtx.Render(w, "login.html", handlers.Page{
 			PageMeta: handlers.MetaData{PageTitle: "Login"},
 			Error:    "Invalid redirect_uri",
 		})
 		if err != nil {
-			log.Printf("Failed to render login page: %v", err)
+			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
 		}
 		return
 	}
-	// TODO create a auth_code_request and store it in the db
 	authReq := new(data.AuthCodeRequest)
-	err = authReq.CreateAuthCodeRequest(connection, user.ID)
+	err = authReq.CreateAuthCodeRequest(ctx, *logger, connection, user.ID)
 	if err != nil {
-		log.Println(err)
+		logger.ErrorContext(ctx, "Failed to create auth code", "error", err)
 		err = tplCtx.Render(w, "login.html", handlers.Page{
 			PageMeta: handlers.MetaData{PageTitle: "Login"},
 			Error:    "Auth code error, please try again later",
 		})
 		if err != nil {
-			log.Printf("Failed to render login page: %v", err)
+			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
 		}
 		return
 	}

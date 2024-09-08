@@ -2,8 +2,7 @@ package data
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"log/slog"
 	"time"
 )
 
@@ -26,25 +25,19 @@ type User struct {
 	RegisteredBy string    `db:"registered_by"`
 }
 
-type AuthCodeRequest struct {
-	ID         int       `db:"id"`
-	UserID     int       `db:"user_id"`
-	AuthCode   uuid.UUID `db:"auth_code"`
-	ValidUntil time.Time `db:"valid_until"`
-}
-
 type UserNotFoundError struct{}
 
 func (e *UserNotFoundError) Error() string {
 	return "User not found"
 }
 
-func (user *User) GetUser(connection *pgxpool.Conn, username string) error {
+func (user *User) GetUser(ctx context.Context, logger slog.Logger, connection DbActions, username string) error {
 	row := connection.QueryRow(
-		context.Background(),
+		ctx,
 		"SELECT * FROM authmantledb.us_user us WHERE us.username = $1",
 		username,
 	)
+	logger.DebugContext(ctx, "User row was queried")
 	err := row.Scan(
 		&user.ID,
 		&user.Username,
@@ -66,55 +59,6 @@ func (user *User) GetUser(connection *pgxpool.Conn, username string) error {
 	if err != nil {
 		return &UserNotFoundError{}
 	}
+	logger.DebugContext(ctx, "User row was scanned successfully")
 	return nil
-}
-
-func (arc *AuthCodeRequest) CreateAuthCodeRequest(connection *pgxpool.Conn, userID int) error {
-	row := connection.QueryRow(
-		context.Background(),
-		"INSERT INTO authmantledb.in_auth_code_requests (id, user_id) VALUES (nextval('authmantledb.in_auth_code_requests_id_seq'), $1) RETURNING *",
-		userID,
-	)
-	err := row.Scan(
-		&arc.ID,
-		&arc.UserID,
-		&arc.AuthCode,
-		&arc.ValidUntil,
-	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (arc *AuthCodeRequest) GetAuthCodeRequest(connection *pgxpool.Conn, code string) error {
-	row := connection.QueryRow(
-		context.Background(),
-		"SELECT * FROM authmantledb.in_auth_code_requests WHERE auth_code = $1",
-		code,
-	)
-	err := row.Scan(
-		&arc.ID,
-		&arc.UserID,
-		&arc.AuthCode,
-		&arc.ValidUntil,
-	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func CheckRedirectURI(connection *pgxpool.Conn, uri string) (bool, error) {
-	row := connection.QueryRow(
-		context.Background(),
-		"SELECT u.redirect_uri FROM authmantledb.in_supp_auth_allowed_redirects u WHERE redirect_uri = $1",
-		uri,
-	)
-	var redir string
-	err := row.Scan(&redir)
-	if err != nil {
-		return false, err
-	}
-	return redir == uri, nil
 }

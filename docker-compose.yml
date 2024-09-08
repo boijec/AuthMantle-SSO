@@ -18,9 +18,27 @@ services:
         ports:
             - "5432:5432"
         environment:
+            TZ: 'Europe/Stockholm'
             POSTGRES_DB: "authmantledb"
             POSTGRES_PASSWORD: "dudde"
         volumes:
             - .\.db\init.sql:/docker-entrypoint-initdb.d/creation.sql
             - .\.db\inserts.sql:/inserts.sql
             #- .\.db\data\:/var/lib/postgresql/data
+    authmantle-api:
+        container_name: "authmantle_api"
+        image: authmantle-api
+        build:
+            context: .
+            dockerfile: Dockerfile
+        depends_on:
+            authmantle-db:
+                condition: service_started
+        links:
+            - authmantle-db
+        networks:
+            - authmantle_net
+        mem_reservation: 50m
+        mem_limit: 50m
+        ports:
+            - "8443:8443"
