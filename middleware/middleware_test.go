@@ -16,7 +16,6 @@ func BenchmarkRegisterMiddlewares(b *testing.B) {
 	}()
 	mainMiddleware := middleware.RegisterMiddlewares(
 		middleware.RequestLogging,
-		middleware.RenderTemplateContext,
 	)
 	router := http.NewServeMux()
 	router.HandleFunc("GET /", dummyRequestHandler)

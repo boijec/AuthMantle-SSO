@@ -22,9 +22,9 @@ func Reload() {
 	//settings := GetOIDCSetting("oidc")
 }
 
-func BootStrapSettings() {
+func BootStrapSettings(db *data.DatabaseHandler) {
 	initOIDCSettings()
-	connection, err := data.GetFetcher().Acquire(context.Background())
+	connection, err := db.Acquire(context.Background())
 	defer func() {
 		connection.Release()
 	}()

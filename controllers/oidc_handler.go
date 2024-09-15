@@ -1,70 +1,48 @@
-package oidc
+package controllers
 
 import (
 	"authmantle-sso/data"
-	"authmantle-sso/handlers"
 	"authmantle-sso/jwk"
 	"authmantle-sso/middleware"
+	"authmantle-sso/utils"
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"log/slog"
 	"net/http"
+	"strconv"
 )
 
-type WellKnownResponse struct {
-	Issuer                            string   `json:"issuer"`
-	AuthorizationEndpoint             string   `json:"authorization_endpoint"`
-	TokenEndpoint                     string   `json:"token_endpoint"`
-	UserinfoEndpoint                  string   `json:"userinfo_endpoint"`
-	EndSessionEndpoint                string   `json:"end_session_endpoint"`
-	JWKsUri                           string   `json:"jwks_uri"`
-	ScopesSupported                   []string `json:"scopes_supported"`
-	ResponseTypesSupported            []string `json:"response_types_supported"`
-	ResponseModesSupported            []string `json:"response_modes_supported"`
-	GrantTypesSupported               []string `json:"grant_types_supported"`
-	SubjectTypesSupported             []string `json:"subject_types_supported"`
-	IdTokenSigningAlgValuesSupported  []string `json:"id_token_signing_alg_values_supported"`
-	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
-	ClaimsSupported                   []string `json:"claims_supported"`
-	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
-}
-type JWKResponse[T any] struct {
-	Keys *[]T `json:"keys"`
-}
-
-type AuthRequest struct {
-	GrantType   string `json:"grant_type"`
-	Code        string `json:"code"`
-	RedirectUri string `json:"redirect_uri"`
-}
-type AuthResponse struct {
-	AccessToken *string `json:"access_token"`
-	IdToken     *string `json:"id_token"`
-	Scope       string  `json:"scope"`
-	ExpiresIn   int     `json:"expires_in"`
-	TokenType   string  `json:"token_type"`
-}
 type EndpointHelper struct {
 	Method      string
 	Endpoint    string
 	FunctionPTR func(w http.ResponseWriter, r *http.Request)
 }
-
-// ConfiguredRoutes global map of configured routes for OIDC discovery
-var ConfiguredRoutes = map[string]*EndpointHelper{
-	"jwks":  {"GET", "/.well-known/jwks.json", HandleJWKs},
-	"auth":  {"POST", "/authorize", HandleAuth},
-	"token": {"POST", "/oauth/token.json", HandleNewToken},
+type AuthRequest struct {
+	GrantType   string `json:"grant_type"`
+	Code        string `json:"code"`
+	RedirectUri string `json:"redirect_uri"`
+}
+type Page struct {
+	PageMeta   MetaData
+	StatusCode int
+	Error      string
+}
+type MetaData struct {
+	PageTitle string
 }
 
-func HandleWellKnown(w http.ResponseWriter, r *http.Request) {
+type Controller struct {
+	Db       *data.DatabaseHandler
+	Renderer *utils.Renderer
+}
+
+func (c *Controller) HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	w.Header().Set("Content-Type", "application/json")
-	wk := new(WellKnownResponse) // temporary retardation.. TODO remove this shit
+	wk := new(data.WellKnownResponse) // temporary retardation.. TODO remove this shit
 	err := json.NewEncoder(w).Encode(wk)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error while encoding JWKs", "error", err)
@@ -87,7 +65,7 @@ func HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 	*/
 }
 
-func HandleJWKs(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) HandleJWKs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	jwkList := make([]jwk.ECJwk, 1) // TODO remove and actually parse some keys
 	defer func() {
@@ -105,7 +83,7 @@ func HandleJWKs(w http.ResponseWriter, r *http.Request) {
 		Y:   fmt.Sprintf("%x", privateKey.Y),
 		D:   fmt.Sprintf("%x", privateKey.D),
 	}
-	j := JWKResponse[jwk.ECJwk]{Keys: &jwkList}
+	j := data.JWKResponse[jwk.ECJwk]{Keys: &jwkList}
 	err = json.NewEncoder(w).Encode(j)
 	if err != nil {
 		http.Error(w, "Failed to encode jwkList", http.StatusInternalServerError)
@@ -140,16 +118,22 @@ func (ar *AuthRequest) ParseContent(contentType string, req *http.Request) error
 	return nil
 }
 
-func HandleNewToken(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := ctx.Value(middleware.LoggerContextKey).(*slog.Logger)
-	connection := ctx.Value(middleware.DbContextKey).(*pgxpool.Conn)
+	connection, err := c.Db.Acquire(ctx)
+	defer connection.Release()
+	if err != nil {
+		logger.Error("Failed to acquire connection", "error", err)
+		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
+		return
+	}
 
 	req := new(AuthRequest)
 	defer func() {
 		req = nil
 	}()
-	err := req.ParseContent(r.Header.Get("Content-Type"), r)
+	err = req.ParseContent(r.Header.Get("Content-Type"), r)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to parse request", http.StatusInternalServerError)
@@ -165,7 +149,7 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	log.Println(req)
 	// TODO validate grant_type, scopes, code and redirect_uri(again)
 
-	res := &AuthResponse{
+	res := &data.AuthResponse{
 		Scope:     "openid profile email",
 		ExpiresIn: 86400,
 		TokenType: "Bearer",
@@ -210,28 +194,32 @@ func HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Status", "200 OK")
 	err = json.NewEncoder(w).Encode(res)
 	if err != nil {
-		http.Error(w, "Failed to encode jwks", http.StatusInternalServerError)
+		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	}
 }
 
-func GetLoginPage(w http.ResponseWriter, r *http.Request) {
-	tplCtx := r.Context().Value(middleware.TemplateContextKey).(*middleware.Templates)
-	tplCtx.Render(w, "login.html", handlers.Page{PageMeta: handlers.MetaData{PageTitle: "Login"}})
+func (c *Controller) GetLoginPage(w http.ResponseWriter, r *http.Request) {
+	c.Renderer.Render(w, "login.html", Page{PageMeta: MetaData{PageTitle: "Login"}})
 }
 
-func HandleAuth(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := ctx.Value(middleware.LoggerContextKey).(*slog.Logger)
-	tplCtx := ctx.Value(middleware.TemplateContextKey).(*middleware.Templates)
-	connection := ctx.Value(middleware.DbContextKey).(*pgxpool.Conn)
+	connection, err := c.Db.Acquire(ctx)
+	defer connection.Release()
+	if err != nil {
+		logger.Error("Failed to acquire connection", "error", err)
+		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
+		return
+	}
 
 	user := new(data.User)
-	err := user.GetUser(ctx, *logger, connection, r.FormValue("username"))
+	err = user.GetUser(ctx, *logger, connection, r.FormValue("username"))
 	if err != nil {
 		logger.InfoContext(ctx, "User not found", "username", r.FormValue("username"))
-		err = tplCtx.Render(w, "login.html", handlers.Page{
-			PageMeta: handlers.MetaData{PageTitle: "Login"},
+		err = c.Renderer.Render(w, "login.html", Page{
+			PageMeta: MetaData{PageTitle: "Login"},
 			Error:    "Invalid Password or Username",
 		})
 		if err != nil {
@@ -241,8 +229,8 @@ func HandleAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	if user.Password != r.FormValue("password") {
 		logger.WarnContext(ctx, "User's credentials did not match!", "username", r.FormValue("username"))
-		err = tplCtx.Render(w, "login.html", handlers.Page{
-			PageMeta: handlers.MetaData{PageTitle: "Login"},
+		err = c.Renderer.Render(w, "login.html", Page{
+			PageMeta: MetaData{PageTitle: "Login"},
 			Error:    "Invalid Password or Username",
 		})
 		if err != nil {
@@ -254,8 +242,8 @@ func HandleAuth(w http.ResponseWriter, r *http.Request) {
 	valid, err := data.CheckRedirectURI(ctx, *logger, connection, redir)
 	if redir == "" || err != nil || !valid {
 		logger.ErrorContext(ctx, "Invalid redirect_uri", "redirect_uri", redir)
-		err = tplCtx.Render(w, "login.html", handlers.Page{
-			PageMeta: handlers.MetaData{PageTitle: "Login"},
+		err = c.Renderer.Render(w, "login.html", Page{
+			PageMeta: MetaData{PageTitle: "Login"},
 			Error:    "Invalid redirect_uri",
 		})
 		if err != nil {
@@ -267,8 +255,8 @@ func HandleAuth(w http.ResponseWriter, r *http.Request) {
 	err = authReq.CreateAuthCodeRequest(ctx, *logger, connection, user.ID)
 	if err != nil {
 		logger.ErrorContext(ctx, "Failed to create auth code", "error", err)
-		err = tplCtx.Render(w, "login.html", handlers.Page{
-			PageMeta: handlers.MetaData{PageTitle: "Login"},
+		err = c.Renderer.Render(w, "login.html", Page{
+			PageMeta: MetaData{PageTitle: "Login"},
 			Error:    "Auth code error, please try again later",
 		})
 		if err != nil {
@@ -277,4 +265,43 @@ func HandleAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("%s?code=%s", redir, authReq.AuthCode), http.StatusSeeOther) // hehe, stupid shit going down right here ;)
+}
+
+func (c *Controller) GetLandingPage(w http.ResponseWriter, r *http.Request) {
+	if s := r.URL.Path; s != "/" { // make sure that the shit does not effect other pages.
+		http.Redirect(w, r, "/error/404", http.StatusSeeOther)
+		return
+	}
+	c.Renderer.Render(w, "index.html", Page{PageMeta: MetaData{PageTitle: "Login"}})
+}
+func (c *Controller) GetRegisterPage(w http.ResponseWriter, r *http.Request) {
+	c.Renderer.Render(w, "register.html", Page{PageMeta: MetaData{PageTitle: "Login"}})
+}
+func (c *Controller) GetAdminPage(w http.ResponseWriter, r *http.Request) {
+	c.Renderer.Render(w, "admin_login.html", Page{PageMeta: MetaData{PageTitle: "Admin Login"}})
+}
+func (c *Controller) ErrorRedirect(w http.ResponseWriter, r *http.Request) {
+	status := parseStatusCode(r.PathValue("status"))
+	c.Renderer.Render(w, "error.html", Page{PageMeta: MetaData{PageTitle: "Error"}, StatusCode: status})
+}
+func parseStatusCode(pathError string) int {
+	if pathError == "" {
+		return http.StatusInternalServerError
+	}
+	if len(pathError) > 4 {
+		return http.StatusInternalServerError
+	}
+	status, err := strconv.Atoi(pathError)
+	if err != nil {
+		return http.StatusInternalServerError
+	}
+
+	return status
+}
+
+func (c *Controller) GetUserSettings(w http.ResponseWriter, r *http.Request) {
+	c.Renderer.Render(w, "user_settings.html", Page{PageMeta: MetaData{PageTitle: "User Settings"}})
+}
+func (c *Controller) GetAdminDashboardPage(w http.ResponseWriter, r *http.Request) {
+	c.Renderer.Render(w, "admin_panel.html", Page{PageMeta: MetaData{PageTitle: "Admin Dashboard"}})
 }

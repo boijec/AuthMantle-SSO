@@ -36,12 +36,10 @@ func CheckRedirectURI(ctx context.Context, logger slog.Logger, connection DbActi
 		"SELECT u.redirect_uri FROM authmantledb.in_supp_auth_allowed_redirects u WHERE redirect_uri = $1",
 		uri,
 	)
-	logger.DebugContext(ctx, "Redirect row was queried")
 	var redir string
 	err := row.Scan(&redir)
 	if err != nil {
 		return false, err
 	}
-	logger.DebugContext(ctx, "Redirect row was scanned without errors")
 	return redir == uri, nil
 }

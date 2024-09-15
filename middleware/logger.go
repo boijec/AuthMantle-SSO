@@ -52,11 +52,3 @@ func RequestLogging(next http.Handler) http.Handler {
 
 	})
 }
-
-func GetLogger(ctx context.Context) *slog.Logger {
-	logger, ok := ctx.Value(LoggerContextKey).(*slog.Logger)
-	if !ok || logger == nil {
-		panic("Logger not found in context")
-	}
-	return logger
-}

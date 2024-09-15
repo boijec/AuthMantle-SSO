@@ -1,10 +1,10 @@
 package main
 
 import (
+	"authmantle-sso/controllers"
 	"authmantle-sso/data"
-	"authmantle-sso/handlers"
 	"authmantle-sso/middleware"
-	"authmantle-sso/oidc"
+	"authmantle-sso/utils"
 	"context"
 	"fmt"
 	"github.com/google/uuid"
@@ -18,25 +18,60 @@ import (
 
 // TODO reformat to not have the entire universe in main - rule #1 of the weekend-warrior: don't be horny in main!
 func main() {
-	data.InitializePool()
+	dbConnection, err := data.InitializePool()
+	defer func() {
+		dbConnection.Close()
+	}()
+	if err != nil {
+		slog.Error("Failed to initialize database connection", "error", err)
+		os.Exit(1)
+	}
+	err = dbConnection.Ping()
+	if err != nil {
+		slog.Error("Failed to ping database post startup", "error", err)
+		os.Exit(1)
+	}
+	renderer, err := utils.InitializeTemplates()
+	if err != nil {
+		slog.Error("Failed to initialize templates", "error", err)
+		os.Exit(1)
+	}
 	uuid.EnableRandPool()
+	slog.SetLogLoggerLevel(slog.LevelInfo)
 	mainMiddleware := middleware.RegisterMiddlewares(
 		middleware.RequestLogging,
-		middleware.RenderTemplateContext,
-		// TODO: this works for now, but if more than like 3 users want to log in, this is going to be a nightmare
-		// fix your shit! instantiate the handlers and inject from main!
-		middleware.InjectDbContext,
+	)
+	rm := middleware.RealmMiddleware{
+		Db: &dbConnection,
+	}
+	realmMiddleware := middleware.RegisterMiddlewares(
+		rm.EnsureRealm,
 	)
 
+	controller := controllers.Controller{
+		Db:       &dbConnection,
+		Renderer: &renderer,
+	}
+
+	// ConfiguredRoutes global map of configured routes for OIDC discovery
+	ConfiguredRoutes := map[string]*controllers.EndpointHelper{
+		"jwks":  {"GET", "/{realm}/.well-known/jwks.json", controller.HandleJWKs},
+		"auth":  {"POST", "/{realm}/authorize", controller.HandleAuth},
+		"token": {"POST", "/{realm}/oauth/token.json", controller.HandleNewToken},
+	}
+
 	openRouter := http.NewServeMux()
-	adminRouter := http.NewServeMux()
-	adminOpenRouter := http.NewServeMux()
-	closedRouter := http.NewServeMux()
+	realmRouter := http.NewServeMux()
+	//closedRouter := http.NewServeMux()
+	router := http.NewServeMux()
+
+	router.Handle("/", middleware.GetRoute(controller.GetLandingPage))
+	router.Handle("/error/{status}", middleware.GetRoute(controller.ErrorRedirect))
 
 	// OIDC registration
-	openRouter.HandleFunc("GET /.well-known/openid-configuration", oidc.HandleWellKnown)
-	for _, v := range oidc.ConfiguredRoutes {
-		openRouter.HandleFunc(fmt.Sprintf("%s %s", v.Method, v.Endpoint), v.FunctionPTR)
+	realmRouter.HandleFunc("GET /{realm}/.well-known/openid-configuration", controller.HandleWellKnown)
+	for _, v := range ConfiguredRoutes {
+		realmRouter.HandleFunc(fmt.Sprintf("%s %s", v.Method, v.Endpoint), v.FunctionPTR)
 	}
 	//openRouter.HandleFunc("GET /.well-known/jwks.json", oidc.HandleJWKs)
 	//openRouter.HandleFunc("POST /authorize", oidc.HandleAuth)
@@ -46,25 +81,13 @@ func main() {
 	// openRouter.HandleFunc("POST /oauth/logout.json", oidc.HandleLogout)
 
 	// UI registration
-	openRouter.HandleFunc("GET /register", handlers.GetRegisterPage)
-	openRouter.HandleFunc("GET /authorize", oidc.GetLoginPage)
+	realmRouter.HandleFunc("GET /{realm}/register", controller.GetRegisterPage)
+	realmRouter.HandleFunc("GET /{realm}/authorize", controller.GetLoginPage)
 
-	openRouter.HandleFunc("GET /error/{status}", handlers.ErrorRedirect)
-	openRouter.HandleFunc("GET /", handlers.GetLandingPage)
+	//closedRouter.HandleFunc("GET /user-info", controller.GetUserSettings)
 
-	adminRouter.HandleFunc("GET /", handlers.GetAdminDashboardPage)
-	adminOpenRouter.HandleFunc("GET /", handlers.GetAdminPage)
-	adminOpenRouter.HandleFunc("POST /", handlers.AdminLogin)
-
-	closedRouter.HandleFunc("GET /", handlers.GetUserSettings)
-	slog.SetLogLoggerLevel(slog.LevelDebug)
-
-	router := http.NewServeMux()
 	router.Handle("/v1/", http.StripPrefix("/v1", openRouter))
-	router.Handle("/protected/", http.StripPrefix("/protected", middleware.EnsureSession(closedRouter)))
-	router.Handle("/adm_console/", http.StripPrefix("/adm_console", middleware.AdminLock(adminRouter)))
-	router.Handle("/adm_login/", http.StripPrefix("/adm_login", adminOpenRouter))
-	router.Handle("GET /admin/console", http.RedirectHandler("/adm_console/", http.StatusSeeOther))
+	router.Handle("/v1/oidc/", http.StripPrefix("/v1/oidc", realmMiddleware(realmRouter)))
 
 	srv := &http.Server{
 		Addr:    "localhost:8443", // TODO export to env
@@ -81,7 +104,7 @@ func main() {
 		}
 	}()
 	<-sigint
-	fmt.Println("Server shutting down...")
+	slog.Info("Server shutting down...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {

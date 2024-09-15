@@ -21,7 +21,6 @@ func (arc *AuthCodeRequest) CreateAuthCodeRequest(ctx context.Context, logger sl
 		"INSERT INTO authmantledb.in_auth_code_requests (id, user_id) VALUES (nextval('authmantledb.in_auth_code_requests_id_seq'), $1) RETURNING *",
 		userID,
 	)
-	logger.DebugContext(ctx, "Auth code row was inserted")
 	err := row.Scan(
 		&arc.ID,
 		&arc.UserID,
@@ -32,7 +31,6 @@ func (arc *AuthCodeRequest) CreateAuthCodeRequest(ctx context.Context, logger sl
 	if err != nil {
 		return err
 	}
-	logger.DebugContext(ctx, "Auth code row was scanned without errors")
 	return nil
 }
 func (arc *AuthCodeRequest) ConsumeAuthCodeRequest(ctx context.Context, logger slog.Logger, connection DbActions) error {
@@ -41,11 +39,9 @@ func (arc *AuthCodeRequest) ConsumeAuthCodeRequest(ctx context.Context, logger s
 		"UPDATE authmantledb.in_auth_code_requests SET consumed = 1 WHERE auth_code = $1",
 		arc.AuthCode,
 	)
-	logger.DebugContext(ctx, "Auth code query was executed")
 	if err != nil {
 		return err
 	}
-	logger.DebugContext(ctx, "Auth code query was executed without errors")
 	return nil
 }
 
@@ -55,7 +51,6 @@ func (arc *AuthCodeRequest) GetAuthCodeRequest(ctx context.Context, logger slog.
 		"SELECT * FROM authmantledb.in_auth_code_requests WHERE auth_code = $1",
 		code,
 	)
-	logger.DebugContext(ctx, "Auth code row was queried")
 	err := row.Scan(
 		&arc.ID,
 		&arc.UserID,
@@ -66,6 +61,5 @@ func (arc *AuthCodeRequest) GetAuthCodeRequest(ctx context.Context, logger slog.
 	if err != nil {
 		return err
 	}
-	logger.DebugContext(ctx, "Auth code row was scanned without errors")
 	return nil
 }

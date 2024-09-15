@@ -37,7 +37,6 @@ func (user *User) GetUser(ctx context.Context, logger slog.Logger, connection Db
 		"SELECT * FROM authmantledb.us_user us WHERE us.username = $1",
 		username,
 	)
-	logger.DebugContext(ctx, "User row was queried")
 	err := row.Scan(
 		&user.ID,
 		&user.Username,
@@ -59,6 +58,5 @@ func (user *User) GetUser(ctx context.Context, logger slog.Logger, connection Db
 	if err != nil {
 		return &UserNotFoundError{}
 	}
-	logger.DebugContext(ctx, "User row was scanned successfully")
 	return nil
 }
