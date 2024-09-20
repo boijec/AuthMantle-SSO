@@ -42,9 +42,22 @@ CREATE TABLE IF NOT EXISTS authmantledb.us_country (
 GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.us_country TO auth_mantle_manager;
 GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.us_country_id_seq TO auth_mantle_manager;
 
+CREATE TABLE IF NOT EXISTS authmantledb.us_realm (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_by VARCHAR(100) NOT NULL,
+    registered_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    registered_by VARCHAR(100) NOT NULL
+);
+GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.us_user TO auth_mantle_manager;
+GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.us_user_id_seq TO auth_mantle_manager;
+
 CREATE TABLE IF NOT EXISTS authmantledb.us_user (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) NOT NULL,
+    realm_id INTEGER NOT NULL,
     role_id INTEGER NOT NULL,
     email VARCHAR(150) NOT NULL,
     password VARCHAR(100) NOT NULL,
@@ -62,7 +75,8 @@ CREATE TABLE IF NOT EXISTS authmantledb.us_user (
     registered_by VARCHAR(100) NOT NULL,
     FOREIGN KEY (share_id) REFERENCES authmantledb.us_share(id),
     FOREIGN KEY (role_id) REFERENCES authmantledb.us_role(id),
-    FOREIGN KEY (country_id) REFERENCES authmantledb.us_country(id)
+    FOREIGN KEY (country_id) REFERENCES authmantledb.us_country(id),
+    FOREIGN KEY (realm_id) REFERENCES authmantledb.us_realm(id)
 );
 GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.us_user TO auth_mantle_manager;
 GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.us_user_id_seq TO auth_mantle_manager;

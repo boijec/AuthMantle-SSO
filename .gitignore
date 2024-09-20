@@ -4,3 +4,4 @@ tmp/
 .keys/*
 !.keys/keepme.md
 !.keys/main.go
+docker-compose-*.yml
