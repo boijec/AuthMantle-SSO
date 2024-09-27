@@ -140,7 +140,7 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	authCode := new(data.AuthCodeRequest)
-	err = authCode.GetAuthCodeRequest(ctx, *logger, connection, req.Code)
+	err = authCode.GetAuthCodeRequest(ctx, connection, req.Code)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to get auth code", http.StatusInternalServerError)
@@ -158,6 +158,13 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
+		return
+	}
+
+	err = authCode.ConsumeAuthCodeRequest(ctx, connection)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to consume auth code", http.StatusInternalServerError)
 		return
 	}
 
@@ -217,13 +224,13 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 	user := new(data.User)
 	err = user.GetUser(ctx, *logger, connection, r.FormValue("username"))
 	if err != nil {
-		logger.InfoContext(ctx, "User not found", "username", r.FormValue("username"))
+		logger.Warn("User not found", "username", r.FormValue("username"), "error", err)
 		err = c.Renderer.Render(w, "login.html", Page{
 			PageMeta: MetaData{PageTitle: "Login"},
 			Error:    "Invalid Password or Username",
 		})
 		if err != nil {
-			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
+			logger.Error("Failed to render login page", "error", err)
 		}
 		return
 	}
@@ -239,7 +246,7 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redir := r.URL.Query().Get("redirect_uri")
-	valid, err := data.CheckRedirectURI(ctx, *logger, connection, redir)
+	valid, err := data.CheckRedirectURI(ctx, connection, redir)
 	if redir == "" || err != nil || !valid {
 		logger.ErrorContext(ctx, "Invalid redirect_uri", "redirect_uri", redir)
 		err = c.Renderer.Render(w, "login.html", Page{
@@ -252,7 +259,7 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	authReq := new(data.AuthCodeRequest)
-	err = authReq.CreateAuthCodeRequest(ctx, *logger, connection, user.ID)
+	err = authReq.CreateAuthCodeRequest(ctx, connection, user.ID)
 	if err != nil {
 		logger.ErrorContext(ctx, "Failed to create auth code", "error", err)
 		err = c.Renderer.Render(w, "login.html", Page{

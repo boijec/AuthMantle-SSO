@@ -30,8 +30,10 @@ func (rm *RealmMiddleware) EnsureRealm(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/error/500", http.StatusSeeOther)
 			return
 		}
-		// TODO replace with real DB call to ensure realm call
-		if parseRealm(r.URL.Path) != "ivory" {
+		realmId := new(int32)
+		result := connection.QueryRow(ctx, "SELECT r.id FROM authmantledb.realm r WHERE r.name = $1", parseRealm(r.URL.Path))
+		err = result.Scan(realmId)
+		if err != nil {
 			http.Redirect(w, r, "/error/404", http.StatusSeeOther)
 			return
 		}

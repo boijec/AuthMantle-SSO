@@ -9,6 +9,7 @@ import (
 type User struct {
 	ID           int       `db:"id"`
 	Username     string    `db:"username"`
+	RealmID      int       `db:"realm_id"`
 	RoleID       int       `db:"role_id"`
 	Email        string    `db:"email"`
 	Password     string    `db:"password"`
@@ -18,7 +19,6 @@ type User struct {
 	City         string    `db:"city"`
 	State        *string   `db:"state"`
 	CountryID    int       `db:"country_id"`
-	ShareID      *int      `db:"share_id"`
 	UpdatedAt    time.Time `db:"updated_at"`
 	UpdatedBy    string    `db:"updated_by"`
 	RegisteredAt time.Time `db:"registered_at"`
@@ -34,12 +34,13 @@ func (e *UserNotFoundError) Error() string {
 func (user *User) GetUser(ctx context.Context, logger slog.Logger, connection DbActions, username string) error {
 	row := connection.QueryRow(
 		ctx,
-		"SELECT * FROM authmantledb.us_user us WHERE us.username = $1",
+		"SELECT * FROM authmantledb.user us WHERE us.username = $1",
 		username,
 	)
 	err := row.Scan(
 		&user.ID,
 		&user.Username,
+		&user.RealmID,
 		&user.RoleID,
 		&user.Email,
 		&user.Password,
@@ -49,7 +50,6 @@ func (user *User) GetUser(ctx context.Context, logger slog.Logger, connection Db
 		&user.City,
 		&user.State,
 		&user.CountryID,
-		&user.ShareID,
 		&user.UpdatedAt,
 		&user.UpdatedBy,
 		&user.RegisteredAt,
