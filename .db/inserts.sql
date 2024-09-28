@@ -224,11 +224,11 @@ VALUES
     (nextval('role_id_seq'), 'user', 'User', NOW(), 'default_SQL', NOW(), 'default_SQL');
 
 INSERT INTO authmantledb.realm(id, name, updated_at, updated_by, registered_at, registered_by)
-VALUES (nextval('realm_id_seq'), 'ivory', NOW(), 'default_SQL', NOW(), 'default_SQL');
+VALUES (nextval('realm_id_seq'), 'master', NOW(), 'default_SQL', NOW(), 'default_SQL');
 
--- remove later -- is essentially invalid
 INSERT INTO authmantledb.supp_auth_audience (id,audience,realm_id,updated_at,updated_by,registered_at,registered_by)
-VALUES (nextval('supp_auth_audience_id_seq'),'https://some-website.dudde.com',currval('realm_id_seq'), NOW(), 'default_SQL', NOW(), 'default_SQL');
+VALUES (nextval('supp_auth_audience_id_seq'),'https://sso.demorith.com',currval('realm_id_seq'), NOW(), 'default_SQL', NOW(), 'default_SQL');
+-- remove later -- is essentially invalid
 INSERT INTO authmantledb.supp_auth_allowed_redirects (id,redirect_uri,realm_id,updated_at,updated_by,registered_at,registered_by)
 VALUES (nextval('supp_auth_allowed_redirects_id_seq'), 'http://localhost:3000', currval('realm_id_seq'), NOW(), 'default_SQL', NOW(), 'default_SQL');
 -- remove later
@@ -249,61 +249,3 @@ VALUES (nextval('supp_auth_claims_id_seq'),'sub',currval('realm_id_seq'), NOW(),
 
 INSERT INTO authmantledb.supp_auth_subject_types (id,subject_type,realm_id,updated_at,updated_by,registered_at,registered_by)
 VALUES (nextval('supp_auth_subject_types_id_seq'),'public',currval('realm_id_seq'), NOW(), 'default_SQL', NOW(), 'default_SQL');
-
-
--- test admin user (remove later)
-insert into authmantledb.user (
-    id,
-    username,
-    realm_id,
-    role_id,
-    email,
-    "password",
-    first_name,
-    last_name,
-    phone_number,
-    city,
-    state,
-    country_id,
-    updated_at,
-    updated_by,
-    registered_at,
-    registered_by
-)
-values
-(
-    nextval('user_id_seq'),
-    'admin',
-    currval('realm_id_seq'),
-    1,
-    'admin@dudde.com',
-    'a$$word',
-    'Admin',
-    '',
-    '0725112233',
-    'Aurora',
-    'Colorado',
-    188,
-    NOW(),
-    'default_SQL',
-    NOW(),
-    'default_SQL'
-),
-(
-    nextval('user_id_seq'),
-    'boijec',
-    currval('realm_id_seq'),
-    currval('role_id_seq'),
-    'user@dudde.com',
-    'a$$word',
-    'Carl',
-    'Boije',
-    '0725112233',
-    'Aurora',
-    'Colorado',
-    188,
-    NOW(),
-    'default_SQL',
-    NOW(),
-    'default_SQL'
-);
