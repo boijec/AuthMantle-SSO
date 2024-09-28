@@ -8,6 +8,7 @@ import (
 type Audience struct {
 	Id           int       `db:"id"`
 	Audience     string    `db:"audience"`
+	RealmId      int       `db:"realm_id"`
 	UpdatedAt    time.Time `db:"updated_at"`
 	UpdatedBy    string    `db:"updated_by"`
 	RegisteredAt time.Time `db:"registered_at"`
@@ -16,6 +17,7 @@ type Audience struct {
 type GrantType struct {
 	Id           int       `db:"id"`
 	GrantType    string    `db:"grant_type"`
+	RealmId      int       `db:"realm_id"`
 	UpdatedAt    time.Time `db:"updated_at"`
 	UpdatedBy    string    `db:"updated_by"`
 	RegisteredAt time.Time `db:"registered_at"`
@@ -24,6 +26,7 @@ type GrantType struct {
 type Scope struct {
 	Id           int       `db:"id"`
 	Scope        string    `db:"scope"`
+	RealmId      int       `db:"realm_id"`
 	UpdatedAt    time.Time `db:"updated_at"`
 	UpdatedBy    string    `db:"updated_by"`
 	RegisteredAt time.Time `db:"registered_at"`
@@ -32,6 +35,7 @@ type Scope struct {
 type Claim struct {
 	Id           int       `db:"id"`
 	Claim        string    `db:"claim"`
+	RealmId      int       `db:"realm_id"`
 	UpdatedAt    time.Time `db:"updated_at"`
 	UpdatedBy    string    `db:"updated_by"`
 	RegisteredAt time.Time `db:"registered_at"`
@@ -40,6 +44,7 @@ type Claim struct {
 type SubjectType struct {
 	Id           int       `db:"id"`
 	SubjectType  string    `db:"subject_type"`
+	RealmId      int       `db:"realm_id"`
 	UpdatedAt    time.Time `db:"updated_at"`
 	UpdatedBy    string    `db:"updated_by"`
 	RegisteredAt time.Time `db:"registered_at"`
@@ -48,6 +53,25 @@ type SubjectType struct {
 type Redirect struct {
 	Id           int       `db:"id"`
 	RedirectURI  string    `db:"redirect_uri"`
+	RealmId      int       `db:"realm_id"`
+	UpdatedAt    time.Time `db:"updated_at"`
+	UpdatedBy    string    `db:"updated_by"`
+	RegisteredAt time.Time `db:"registered_at"`
+	RegisteredBy string    `db:"registered_by"`
+}
+type ResponseType struct {
+	Id           int       `db:"id"`
+	ResponseType string    `db:"response_type"`
+	RealmId      int       `db:"realm_id"`
+	UpdatedAt    time.Time `db:"updated_at"`
+	UpdatedBy    string    `db:"updated_by"`
+	RegisteredAt time.Time `db:"registered_at"`
+	RegisteredBy string    `db:"registered_by"`
+}
+type TokenSigningAlg struct {
+	Id           int       `db:"id"`
+	SigningAlg   string    `db:"signing_alg"`
+	RealmId      int       `db:"realm_id"`
 	UpdatedAt    time.Time `db:"updated_at"`
 	UpdatedBy    string    `db:"updated_by"`
 	RegisteredAt time.Time `db:"registered_at"`
