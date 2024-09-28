@@ -41,9 +41,25 @@ type Controller struct {
 func (c *Controller) HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	logger := ctx.Value(middleware.LoggerContextKey).(*slog.Logger)
+	realmName := ctx.Value(middleware.RealmContextKey).(string)
+	connection, err := c.Db.Acquire(ctx)
+	defer connection.Release()
+	if err != nil {
+		logger.Error("Failed to acquire connection", "error", err)
+		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	wk := new(data.WellKnownResponse) // temporary retardation.. TODO remove this shit
-	err := json.NewEncoder(w).Encode(wk)
+	rs := new(data.RealmCacheObject)
+	err = rs.GetRealmSettings(ctx, connection, realmName)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error while getting realm settings", "error", err)
+		http.Error(w, "Error while getting realm settings", http.StatusInternalServerError)
+		return
+	}
+	//wk := new(data.WellKnownResponse) // TODO add realm settings to the new initialized response..
+	err = json.NewEncoder(w).Encode(rs)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error while encoding JWKs", "error", err)
 		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)

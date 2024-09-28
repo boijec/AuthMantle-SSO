@@ -12,13 +12,6 @@ const RealmContextKey ContextKey = "realm"
 type RealmMiddleware struct {
 	Db *data.DatabaseHandler
 }
-type CacheWrapper struct {
-	Realm string
-}
-
-// TODO call the db, once, ffs you're fucking it up again... use a timestamp to check if it needs to be refreshed.
-// first caller will take the perf-hit.. TODO un-fuck this!
-var cacheWrapper *CacheWrapper
 
 func (rm *RealmMiddleware) EnsureRealm(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -30,15 +23,16 @@ func (rm *RealmMiddleware) EnsureRealm(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/error/500", http.StatusSeeOther)
 			return
 		}
-		realmId := new(int32)
-		result := connection.QueryRow(ctx, "SELECT r.id FROM authmantledb.realm r WHERE r.name = $1", parseRealm(r.URL.Path))
+		realmId := new(int)
+		realmName := parseRealm(r.URL.Path)
+		result := connection.QueryRow(ctx, "SELECT count(*) FROM authmantledb.realm r WHERE r.name = $1", realmName)
 		err = result.Scan(realmId)
-		if err != nil {
+		if err != nil || *realmId != 1 {
 			http.Redirect(w, r, "/error/404", http.StatusSeeOther)
 			return
 		}
 
-		newCtx := context.WithValue(ctx, RealmContextKey, r.PathValue("realm"))
+		newCtx := context.WithValue(ctx, RealmContextKey, realmName)
 		next.ServeHTTP(w, r.WithContext(newCtx))
 	})
 }

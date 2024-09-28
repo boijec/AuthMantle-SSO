@@ -53,6 +53,25 @@ type Redirect struct {
 	RegisteredAt time.Time `db:"registered_at"`
 	RegisteredBy string    `db:"registered_by"`
 }
+type Realm struct {
+	Id           int       `db:"id"`
+	Name         string    `db:"name"`
+	UpdatedAt    time.Time `db:"updated_at"`
+	UpdatedBy    string    `db:"updated_by"`
+	RegisteredAt time.Time `db:"registered_at"`
+	RegisteredBy string    `db:"registered_by"`
+}
+
+type RealmCacheObject struct {
+	RealmId      *int
+	RealmName    string
+	Redirects    []Redirect
+	SubjectTypes []SubjectType
+	GrantTypes   []GrantType
+	Scopes       []Scope
+	Claims       []Claim
+	Audience     []Audience
+}
 
 func CheckRedirectURI(ctx context.Context, connection DbActions, uri string) (bool, error) {
 	row := connection.QueryRow(
@@ -66,4 +85,23 @@ func CheckRedirectURI(ctx context.Context, connection DbActions, uri string) (bo
 		return false, err
 	}
 	return redir == uri, nil
+}
+
+// TODO Figure out how to malloc the settings strings without a count query prior to every query
+
+func (rco *RealmCacheObject) GetRealmSettings(ctx context.Context, connection DbActions, realmName string) error {
+	realmRow := connection.QueryRow(
+		ctx,
+		"SELECT r.id, r.name FROM authmantledb.realm r WHERE r.name = $1",
+		realmName,
+	)
+	err := realmRow.Scan(
+		&rco.RealmId,
+		&rco.RealmName,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
