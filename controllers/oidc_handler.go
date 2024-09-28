@@ -24,10 +24,13 @@ type AuthRequest struct {
 	Code        string `json:"code"`
 	RedirectUri string `json:"redirect_uri"`
 }
-type Page struct {
-	PageMeta   MetaData
-	StatusCode int
-	Error      string
+type Page struct { // TODO move Countries from here
+	PageMeta           MetaData
+	RealmName          string
+	EnableRegistration bool
+	StatusCode         int
+	Countries          []data.Country
+	Error              string
 }
 type MetaData struct {
 	PageTitle string
@@ -223,7 +226,11 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) GetLoginPage(w http.ResponseWriter, r *http.Request) {
-	c.Renderer.Render(w, "login.html", Page{PageMeta: MetaData{PageTitle: "Login"}})
+	c.Renderer.Render(w, "login.html", Page{
+		RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
+		EnableRegistration: true,
+		PageMeta:           MetaData{PageTitle: "Login"},
+	})
 }
 
 func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
@@ -243,8 +250,10 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Warn("User not found", "username", r.FormValue("username"), "error", err)
 		err = c.Renderer.Render(w, "login.html", Page{
-			PageMeta: MetaData{PageTitle: "Login"},
-			Error:    "Invalid Password or Username",
+			PageMeta:           MetaData{PageTitle: "Login"},
+			RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
+			EnableRegistration: true,
+			Error:              "Invalid Password or Username",
 		})
 		if err != nil {
 			logger.Error("Failed to render login page", "error", err)
@@ -254,8 +263,10 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 	if user.Password != r.FormValue("password") {
 		logger.WarnContext(ctx, "User's credentials did not match!", "username", r.FormValue("username"))
 		err = c.Renderer.Render(w, "login.html", Page{
-			PageMeta: MetaData{PageTitle: "Login"},
-			Error:    "Invalid Password or Username",
+			PageMeta:           MetaData{PageTitle: "Login"},
+			RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
+			EnableRegistration: true,
+			Error:              "Invalid Password or Username",
 		})
 		if err != nil {
 			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
@@ -267,8 +278,10 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 	if redir == "" || err != nil || !valid {
 		logger.ErrorContext(ctx, "Invalid redirect_uri", "redirect_uri", redir)
 		err = c.Renderer.Render(w, "login.html", Page{
-			PageMeta: MetaData{PageTitle: "Login"},
-			Error:    "Invalid redirect_uri",
+			PageMeta:           MetaData{PageTitle: "Login"},
+			RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
+			EnableRegistration: true,
+			Error:              "Invalid redirect_uri",
 		})
 		if err != nil {
 			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
@@ -280,8 +293,10 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.ErrorContext(ctx, "Failed to create auth code", "error", err)
 		err = c.Renderer.Render(w, "login.html", Page{
-			PageMeta: MetaData{PageTitle: "Login"},
-			Error:    "Auth code error, please try again later",
+			PageMeta:           MetaData{PageTitle: "Login"},
+			RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
+			EnableRegistration: true,
+			Error:              "Auth code error, please try again later",
 		})
 		if err != nil {
 			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
@@ -299,7 +314,30 @@ func (c *Controller) GetLandingPage(w http.ResponseWriter, r *http.Request) {
 	c.Renderer.Render(w, "index.html", Page{PageMeta: MetaData{PageTitle: "Login"}})
 }
 func (c *Controller) GetRegisterPage(w http.ResponseWriter, r *http.Request) {
-	c.Renderer.Render(w, "register.html", Page{PageMeta: MetaData{PageTitle: "Login"}})
+	ctx := r.Context()
+	logger := ctx.Value(middleware.LoggerContextKey).(*slog.Logger)
+	connection, err := c.Db.Acquire(ctx)
+	defer connection.Release()
+	if err != nil {
+		logger.Error("Failed to acquire connection", "error", err)
+		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
+		return
+	}
+	countries, err := data.GetCountries(ctx, connection)
+	if err != nil {
+		logger.Error("Failed to acquire connection", "error", err)
+		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
+		return
+	}
+	err = c.Renderer.Render(w, "register.html", Page{
+		RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
+		EnableRegistration: true,
+		PageMeta:           MetaData{PageTitle: "Login"},
+		Countries:          countries,
+	})
+	if err != nil {
+		logger.Error("Failed to render register page", "error", err)
+	}
 }
 func (c *Controller) GetAdminPage(w http.ResponseWriter, r *http.Request) {
 	c.Renderer.Render(w, "admin_login.html", Page{PageMeta: MetaData{PageTitle: "Admin Login"}})

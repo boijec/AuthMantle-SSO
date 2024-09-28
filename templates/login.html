@@ -7,7 +7,7 @@
                 <div class="flex flex-col items-center justify-center h-full">
                     <div class="min-w-[345px] min-h-[485px] bg-white rounded-md shaddow-lg p-[34px]">
                         {{ template "pageHeader" . }}
-                        <form method="POST" aciton="/login" class="flex flex-col justify-between mt-3 space-y-4">
+                        <form method="POST" class="flex flex-col justify-between mt-3 space-y-4">
                             {{ $length := len .Error }}
                             <div class="flex flex-col">
                                 <label for="username">Username</label>
@@ -21,7 +21,9 @@
                                 <p class="text-red-500 py-2">{{ .Error }}</p>
                             {{ end }}
                             <input type="submit" value="Login" class="mt-5 px-4 py-2 bg-blue-500 text-white rounded-md" />
-                            <a href="/register" class="mt-5 px-4 py-2 bg-blue-500 text-white rounded-md text-center">Register</a>
+                            {{ if .EnableRegistration }}
+                                <a href="/v1/oidc/{{ .RealmName }}/register" class="mt-5 px-4 py-2 bg-blue-500 text-white rounded-md text-center">Register</a>
+                            {{ end }}
                         </form>
                     </div>
                     {{template "footer" .}}

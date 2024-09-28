@@ -29,8 +29,8 @@ func (rm *RealmMiddleware) EnsureRealm(next http.Handler) http.Handler {
 		}
 		realmId := new(int)
 		realmName := parseRealm(r.URL.Path)
-		result := connection.QueryRow(ctx, "SELECT r.id FROM authmantledb.realm r WHERE r.name = $1", realmName)
-		err = result.Scan(realmId)
+		result := connection.QueryRow(ctx, "SELECT r.id, r.name FROM authmantledb.realm r WHERE r.name = $1", realmName)
+		err = result.Scan(realmId, &realmName)
 		if err != nil || realmId == nil {
 			logger.Error("Failed to find realm for request", "error", err)
 			http.Redirect(w, r, "/error/404", http.StatusSeeOther)
@@ -38,6 +38,7 @@ func (rm *RealmMiddleware) EnsureRealm(next http.Handler) http.Handler {
 		}
 
 		newCtx := context.WithValue(ctx, RealmIDContextKey, *realmId)
+		newCtx = context.WithValue(newCtx, RealmContextKey, realmName)
 		next.ServeHTTP(w, r.WithContext(newCtx))
 	})
 }

@@ -8,6 +8,7 @@
                     <div class="min-w-[345px] min-h-[485px] bg-white rounded-md shaddow-lg p-[34px]">
                         {{ template "pageHeader" . }}
                         <form hx-post="/api/hello" class="flex flex-col justify-between mt-3 space-y-4">
+                            <a href="/v1/oidc/{{ .RealmName }}/authorize" class="mt-5 px-4 py-2 bg-green-700 text-center text-white rounded-md">Back</a>
                             <div class="flex flex-col">
                                 <label for="username">Username</label>
                                 <input type="text" name="username" placeholder="Username" class="py-[10px] px-2 rounded-sm bg-slate-100" />
@@ -15,6 +16,16 @@
                             <div class="flex flex-col">
                                 <label for="email">Email</label>
                                 <input type="text" name="email" placeholder="Email" class="py-[10px] px-2 rounded-sm bg-slate-100" />
+                            </div>
+                            <div class="flex flex-col">
+                                <label for="country_select">Country</label>
+                                <select name="country" id="country_select" class="py-[10px] px-2 rounded-sm bg-slate-100">
+                                    <option value="">Select Country</option>
+                                    <!-- loop through an array of country objects from a golang array -->
+                                    {{ range .Countries }}
+                                        <option value="{{ .Id }}">{{ .CountryName }}</option>
+                                    {{ end }}
+                                </select>
                             </div>
                             <div class="flex flex-col">
                                 <label for="phone">Phone number</label>
