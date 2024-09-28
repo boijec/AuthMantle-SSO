@@ -63,14 +63,16 @@ type Realm struct {
 }
 
 type RealmCacheObject struct {
-	RealmId      *int
-	RealmName    string
-	Redirects    []Redirect
-	SubjectTypes []SubjectType
-	GrantTypes   []GrantType
-	Scopes       []Scope
-	Claims       []Claim
-	Audience     []Audience
+	RealmId          *int
+	RealmName        string
+	Redirects        []string
+	SubjectTypes     []string
+	GrantTypes       []string
+	Scopes           []string
+	Claims           []string
+	Audience         []string
+	ResponseTypes    []string
+	TokenSigningAlgs []string
 }
 
 func CheckRedirectURI(ctx context.Context, connection DbActions, uri string) (bool, error) {
@@ -101,6 +103,158 @@ func (rco *RealmCacheObject) GetRealmSettings(ctx context.Context, connection Db
 	)
 	if err != nil {
 		return err
+	}
+	redirects, err := connection.Query(
+		ctx,
+		"SELECT r.redirect_uri FROM authmantledb.supp_auth_allowed_redirects r WHERE r.realm_id = $1",
+		realmId,
+	)
+	defer redirects.Close()
+	if err != nil {
+		return err
+	}
+	for redirects.Next() {
+		var redir string
+		err = redirects.Scan(
+			&redir,
+		)
+		if err != nil {
+			return err
+		}
+		rco.Redirects = append(rco.Redirects, redir)
+	}
+	subjectTypes, err := connection.Query(
+		ctx,
+		"SELECT s.subject_type FROM authmantledb.supp_auth_subject_types s WHERE s.realm_id = $1",
+		realmId,
+	)
+	defer subjectTypes.Close()
+	if err != nil {
+		return err
+	}
+	for subjectTypes.Next() {
+		var st string
+		err = subjectTypes.Scan(
+			&st,
+		)
+		if err != nil {
+			return err
+		}
+		rco.SubjectTypes = append(rco.SubjectTypes, st)
+	}
+	grantTypes, err := connection.Query(
+		ctx,
+		"SELECT g.grant_type FROM authmantledb.supp_auth_grant_types g WHERE g.realm_id = $1",
+		realmId,
+	)
+	defer grantTypes.Close()
+	if err != nil {
+		return err
+	}
+	for grantTypes.Next() {
+		var gt string
+		err = grantTypes.Scan(
+			&gt,
+		)
+		if err != nil {
+			return err
+		}
+		rco.GrantTypes = append(rco.GrantTypes, gt)
+	}
+	scopes, err := connection.Query(
+		ctx,
+		"SELECT s.scope FROM authmantledb.supp_auth_scopes s WHERE s.realm_id = $1",
+		realmId,
+	)
+	defer scopes.Close()
+	if err != nil {
+		return err
+	}
+	for scopes.Next() {
+		var sc string
+		err = scopes.Scan(
+			&sc,
+		)
+		if err != nil {
+			return err
+		}
+		rco.Scopes = append(rco.Scopes, sc)
+	}
+	claims, err := connection.Query(
+		ctx,
+		"SELECT c.claim FROM authmantledb.supp_auth_claims c WHERE c.realm_id = $1",
+		realmId,
+	)
+	defer claims.Close()
+	if err != nil {
+		return err
+	}
+	for claims.Next() {
+		var cl string
+		err = claims.Scan(
+			&cl,
+		)
+		if err != nil {
+			return err
+		}
+		rco.Claims = append(rco.Claims, cl)
+	}
+	audience, err := connection.Query(
+		ctx,
+		"SELECT a.audience FROM authmantledb.supp_auth_audience a WHERE a.realm_id = $1",
+		realmId,
+	)
+	defer audience.Close()
+	if err != nil {
+		return err
+	}
+	for audience.Next() {
+		var aud string
+		err = audience.Scan(
+			&aud,
+		)
+		if err != nil {
+			return err
+		}
+		rco.Audience = append(rco.Audience, aud)
+	}
+	responseTypes, err := connection.Query(
+		ctx,
+		"SELECT r.response_type FROM authmantledb.supp_auth_response_types r WHERE r.realm_id = $1",
+		realmId,
+	)
+	defer responseTypes.Close()
+	if err != nil {
+		return err
+	}
+	for responseTypes.Next() {
+		var rt string
+		err = responseTypes.Scan(
+			&rt,
+		)
+		if err != nil {
+			return err
+		}
+		rco.ResponseTypes = append(rco.ResponseTypes, rt)
+	}
+	tokenSigningAlgs, err := connection.Query(
+		ctx,
+		"SELECT t.signing_alg FROM authmantledb.supp_id_token_signing_alg_values t WHERE t.realm_id = $1",
+		realmId,
+	)
+	defer tokenSigningAlgs.Close()
+	if err != nil {
+		return err
+	}
+	for tokenSigningAlgs.Next() {
+		var tsa string
+		err = tokenSigningAlgs.Scan(
+			&tsa,
+		)
+		if err != nil {
+			return err
+		}
+		rco.TokenSigningAlgs = append(rco.TokenSigningAlgs, tsa)
 	}
 
 	return nil

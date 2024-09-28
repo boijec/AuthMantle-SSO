@@ -5,10 +5,10 @@ import (
 	"authmantle-sso/jwk"
 	"authmantle-sso/middleware"
 	"authmantle-sso/utils"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -23,17 +23,7 @@ type AuthRequest struct {
 	GrantType   string `json:"grant_type"`
 	Code        string `json:"code"`
 	RedirectUri string `json:"redirect_uri"`
-}
-type Page struct { // TODO move Countries from here
-	PageMeta           MetaData
-	RealmName          string
-	EnableRegistration bool
-	StatusCode         int
-	Countries          []data.Country
-	Error              string
-}
-type MetaData struct {
-	PageTitle string
+	ClientId    string `json:"client_id"`
 }
 
 type Controller struct {
@@ -61,13 +51,21 @@ func (c *Controller) HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error while getting realm settings", http.StatusInternalServerError)
 		return
 	}
-	//wk := new(data.WellKnownResponse) // TODO add realm settings to the new initialized response..
-	err = json.NewEncoder(w).Encode(rs)
+	wk := new(data.WellKnownResponse)
+	wk.ClaimsSupported = rs.Claims
+	wk.GrantTypesSupported = rs.GrantTypes
+	wk.ScopesSupported = rs.Scopes
+	wk.SubjectTypesSupported = rs.SubjectTypes
+	wk.ResponseTypesSupported = rs.ResponseTypes
+	wk.IdTokenSigningAlgValuesSupported = rs.TokenSigningAlgs
+
+	err = json.NewEncoder(w).Encode(wk)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error while encoding JWKs", "error", err)
 		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	}
+	// TODO implement this tomorrow, too tired to look at this for another weekend, plz god!
 	/*
 		"issuer": "http://localhost:8080",
 		"authorization_endpoint": "http://localhost:8080/v1/authorize",
@@ -126,6 +124,7 @@ func (ar *AuthRequest) ParseContent(contentType string, req *http.Request) error
 		ar.GrantType = req.FormValue("grant_type")
 		ar.Code = req.FormValue("code")
 		ar.RedirectUri = req.FormValue("redirect_uri")
+		ar.ClientId = req.FormValue("client_id")
 	case "application/json":
 		err := json.NewDecoder(req.Body).Decode(ar)
 		if err != nil {
@@ -143,31 +142,27 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	connection, err := c.Db.Acquire(ctx)
 	defer connection.Release()
 	if err != nil {
-		logger.Error("Failed to acquire connection", "error", err)
+		logger.ErrorContext(ctx, "Failed to acquire connection", "error", err)
 		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
 		return
 	}
 
 	req := new(AuthRequest)
-	defer func() {
-		req = nil
-	}()
 	err = req.ParseContent(r.Header.Get("Content-Type"), r)
 	if err != nil {
-		log.Println(err)
+		logger.ErrorContext(ctx, "Failed to parse request", "error", err)
 		http.Error(w, "Failed to parse request", http.StatusInternalServerError)
 		return
 	}
 	authCode := new(data.AuthCodeRequest)
 	err = authCode.GetAuthCodeRequest(ctx, connection, req.Code)
 	if err != nil {
-		log.Println(err)
+		logger.ErrorContext(ctx, "Failed to get auth code", "error", err)
 		http.Error(w, "Failed to get auth code", http.StatusInternalServerError)
 		return
 	}
-	log.Println(req)
-	// TODO validate grant_type, scopes, code and redirect_uri(again)
 
+	// rip from-here
 	res := &data.AuthResponse{
 		Scope:     "openid profile email",
 		ExpiresIn: 86400,
@@ -175,14 +170,14 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	}
 	privateKey, err := jwk.GetSigningKey()
 	if err != nil {
-		log.Println(err)
+		logger.ErrorContext(ctx, "Failed to encode JWKs", "error", err)
 		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	}
 
 	err = authCode.ConsumeAuthCodeRequest(ctx, connection)
 	if err != nil {
-		log.Println(err)
+		logger.ErrorContext(ctx, "Failed to consume auth code", "error", err)
 		http.Error(w, "Failed to consume auth code", http.StatusInternalServerError)
 		return
 	}
@@ -191,7 +186,7 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		"foo": "idToken",
 	})
 	if token, err := idToken.SignedString(privateKey); err != nil {
-		log.Println(err)
+		logger.ErrorContext(ctx, "Failed to encode JWKs", "error", err)
 		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	} else {
@@ -205,7 +200,7 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		"foo": "accessToken",
 	})
 	if token, err := accessToken.SignedString(privateKey); err != nil {
-		log.Println(err)
+		logger.ErrorContext(ctx, "Failed to encode JWKs", "error", err)
 		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	} else {
@@ -215,22 +210,41 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		res.AccessToken = nil
 	}()
+	// to here
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Status", "200 OK")
 	err = json.NewEncoder(w).Encode(res)
 	if err != nil {
-		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
+		logger.ErrorContext(ctx, "Failed to encode json", "error", err)
+		http.Error(w, "Failed to encode json", http.StatusInternalServerError)
 		return
 	}
 }
 
 func (c *Controller) GetLoginPage(w http.ResponseWriter, r *http.Request) {
-	c.Renderer.Render(w, "login.html", Page{
-		RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
-		EnableRegistration: true,
-		PageMeta:           MetaData{PageTitle: "Login"},
-	})
+	ctx := r.Context()
+	logger := ctx.Value(middleware.LoggerContextKey).(*slog.Logger)
+	connection, err := c.Db.Acquire(ctx)
+	defer connection.Release()
+	if err != nil {
+		logger.Error("Failed to acquire connection", "error", err)
+		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
+		return
+	}
+
+	valid := c.validateRedirect(ctx, w, connection, r.URL.Query().Get("redirect_uri"))
+	if !valid {
+		return
+	}
+
+	// TODO implement following:
+	//valid = c.validateScope(ctx, w, connection, r.URL.Query().Get("scope"))
+	//valid = c.validateResponseType(ctx, w, connection, r.URL.Query().Get("response_type"))
+	//valid = c.validateClientId(ctx, w, connection, r.URL.Query().Get("client_id"))
+	//valid = c.validateAudience(ctx, w, connection, r.URL.Query().Get("audience"))
+
+	c.Renderer.Render(r.Context(), w, "authorize.html", "Login")
 }
 
 func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
@@ -243,64 +257,31 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
 		return
 	}
+
 	realmId := ctx.Value(middleware.RealmIDContextKey).(int)
+	redir := r.URL.Query().Get("redirect_uri")
+	valid := c.validateRedirect(ctx, w, connection, redir)
+	if !valid {
+		return
+	}
 
 	user := new(data.User)
 	err = user.GetUser(ctx, connection, r.FormValue("username"), realmId)
 	if err != nil {
 		logger.Warn("User not found", "username", r.FormValue("username"), "error", err)
-		err = c.Renderer.Render(w, "login.html", Page{
-			PageMeta:           MetaData{PageTitle: "Login"},
-			RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
-			EnableRegistration: true,
-			Error:              "Invalid Password or Username",
-		})
-		if err != nil {
-			logger.Error("Failed to render login page", "error", err)
-		}
+		c.Renderer.RenderErr(ctx, w, "authorize.html", "Login", "Invalid Password or Username")
 		return
 	}
 	if user.Password != r.FormValue("password") {
 		logger.WarnContext(ctx, "User's credentials did not match!", "username", r.FormValue("username"))
-		err = c.Renderer.Render(w, "login.html", Page{
-			PageMeta:           MetaData{PageTitle: "Login"},
-			RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
-			EnableRegistration: true,
-			Error:              "Invalid Password or Username",
-		})
-		if err != nil {
-			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
-		}
-		return
-	}
-	redir := r.URL.Query().Get("redirect_uri")
-	valid, err := data.CheckRedirectURI(ctx, connection, redir)
-	if redir == "" || err != nil || !valid {
-		logger.ErrorContext(ctx, "Invalid redirect_uri", "redirect_uri", redir)
-		err = c.Renderer.Render(w, "login.html", Page{
-			PageMeta:           MetaData{PageTitle: "Login"},
-			RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
-			EnableRegistration: true,
-			Error:              "Invalid redirect_uri",
-		})
-		if err != nil {
-			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
-		}
+		c.Renderer.RenderErr(ctx, w, "authorize.html", "Login", "Invalid Password or Username")
 		return
 	}
 	authReq := new(data.AuthCodeRequest)
 	err = authReq.CreateAuthCodeRequest(ctx, connection, user.ID)
 	if err != nil {
 		logger.ErrorContext(ctx, "Failed to create auth code", "error", err)
-		err = c.Renderer.Render(w, "login.html", Page{
-			PageMeta:           MetaData{PageTitle: "Login"},
-			RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
-			EnableRegistration: true,
-			Error:              "Auth code error, please try again later",
-		})
-		if err != nil {
-			logger.ErrorContext(ctx, "Failed to render login page", "error", err)
-		}
+		c.Renderer.RenderErr(ctx, w, "authorize.html", "Login", "Auth code error, please try again later")
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("%s?code=%s", redir, authReq.AuthCode), http.StatusSeeOther) // hehe, stupid shit going down right here ;)
@@ -311,7 +292,7 @@ func (c *Controller) GetLandingPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/error/404", http.StatusSeeOther)
 		return
 	}
-	c.Renderer.Render(w, "index.html", Page{PageMeta: MetaData{PageTitle: "Login"}})
+	c.Renderer.Render(r.Context(), w, "authorize.html", "Login")
 }
 func (c *Controller) GetRegisterPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -329,22 +310,39 @@ func (c *Controller) GetRegisterPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
 		return
 	}
-	err = c.Renderer.Render(w, "register.html", Page{
+	c.Renderer.RenderWithData(ctx, w, "register.html", utils.Page{
 		RealmName:          r.Context().Value(middleware.RealmContextKey).(string),
 		EnableRegistration: true,
-		PageMeta:           MetaData{PageTitle: "Login"},
+		PageMeta:           utils.MetaData{PageTitle: "Login"},
 		Countries:          countries,
 	})
-	if err != nil {
-		logger.Error("Failed to render register page", "error", err)
-	}
 }
+
+func (c *Controller) validateRedirect(ctx context.Context, w http.ResponseWriter, connection data.DbActions, redir string) bool {
+	logger := ctx.Value(middleware.LoggerContextKey).(*slog.Logger)
+	valid, err := data.CheckRedirectURI(ctx, connection, redir)
+	if redir == "" || err != nil || !valid {
+		logger.ErrorContext(ctx, "Invalid redirect_uri", "redirect_uri", redir)
+		c.Renderer.RenderWithData(ctx, w, "error.html", utils.Page{
+			PageMeta:   utils.MetaData{PageTitle: "Bad Request"},
+			StatusCode: http.StatusBadRequest,
+			Error:      "Invalid redirect_uri",
+		})
+		return false
+	}
+	return true
+}
+
 func (c *Controller) GetAdminPage(w http.ResponseWriter, r *http.Request) {
-	c.Renderer.Render(w, "admin_login.html", Page{PageMeta: MetaData{PageTitle: "Admin Login"}})
+	c.Renderer.RenderWithData(r.Context(), w, "admin_login.html", utils.Page{PageMeta: utils.MetaData{PageTitle: "Admin Login"}})
 }
 func (c *Controller) ErrorRedirect(w http.ResponseWriter, r *http.Request) {
 	status := parseStatusCode(r.PathValue("status"))
-	c.Renderer.Render(w, "error.html", Page{PageMeta: MetaData{PageTitle: "Error"}, StatusCode: status})
+	c.Renderer.RenderWithData(r.Context(), w, "error.html", utils.Page{
+		PageMeta:   utils.MetaData{PageTitle: "Error"},
+		StatusCode: status,
+		Error:      http.StatusText(status),
+	})
 }
 func parseStatusCode(pathError string) int {
 	if pathError == "" {
@@ -362,8 +360,8 @@ func parseStatusCode(pathError string) int {
 }
 
 func (c *Controller) GetUserSettings(w http.ResponseWriter, r *http.Request) {
-	c.Renderer.Render(w, "user_settings.html", Page{PageMeta: MetaData{PageTitle: "User Settings"}})
+	c.Renderer.RenderWithData(r.Context(), w, "user_settings.html", utils.Page{PageMeta: utils.MetaData{PageTitle: "User Settings"}})
 }
 func (c *Controller) GetAdminDashboardPage(w http.ResponseWriter, r *http.Request) {
-	c.Renderer.Render(w, "admin_panel.html", Page{PageMeta: MetaData{PageTitle: "Admin Dashboard"}})
+	c.Renderer.RenderWithData(r.Context(), w, "admin_panel.html", utils.Page{PageMeta: utils.MetaData{PageTitle: "Admin Dashboard"}})
 }

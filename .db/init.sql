@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS authmantledb.auth_code_requests (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     auth_code UUID NOT NULL DEFAULT gen_random_uuid(),
-    valid_until TIMESTAMP NOT NULL DEFAULT NOW() + (15 * INTERVAL '1 minute'),
+    valid_until TIMESTAMP NOT NULL DEFAULT NOW() + (30 * INTERVAL '1 second'),
     consumed INTEGER NOT NULL DEFAULT 0,
 
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -179,6 +179,36 @@ CREATE TABLE IF NOT EXISTS authmantledb.supp_auth_subject_types (
 );
 GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.supp_auth_subject_types TO auth_mantle_manager;
 GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.supp_auth_subject_types_id_seq TO auth_mantle_manager;
+
+CREATE TABLE IF NOT EXISTS authmantledb.supp_auth_response_types (
+    id SERIAL PRIMARY KEY,
+    response_type VARCHAR(200) NOT NULL,
+    realm_id INTEGER NOT NULL,
+
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_by VARCHAR(100) NOT NULL,
+    registered_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    registered_by VARCHAR(100) NOT NULL,
+
+    FOREIGN KEY (realm_id) REFERENCES authmantledb.realm(id)
+);
+GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.supp_auth_response_types TO auth_mantle_manager;
+GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.supp_auth_response_types_id_seq TO auth_mantle_manager;
+
+CREATE TABLE IF NOT EXISTS authmantledb.supp_id_token_signing_alg_values (
+     id SERIAL PRIMARY KEY,
+     signing_alg VARCHAR(200) NOT NULL,
+     realm_id INTEGER NOT NULL,
+
+     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+     updated_by VARCHAR(100) NOT NULL,
+     registered_at TIMESTAMP NOT NULL DEFAULT NOW(),
+     registered_by VARCHAR(100) NOT NULL,
+
+     FOREIGN KEY (realm_id) REFERENCES authmantledb.realm(id)
+);
+GRANT INSERT, UPDATE, DELETE, SELECT ON authmantledb.supp_id_token_signing_alg_values TO auth_mantle_manager;
+GRANT USAGE, SELECT, UPDATE ON SEQUENCE authmantledb.supp_id_token_signing_alg_values_id_seq TO auth_mantle_manager;
 
 CREATE TABLE IF NOT EXISTS authmantledb.supp_auth_allowed_redirects (
     id SERIAL PRIMARY KEY,

@@ -6,6 +6,7 @@
             {{ template "pageHeader" . }}
             <div class="text-center text-lg">
                 <h3>Error {{ .StatusCode }}</h3>
+                <p class="text-sm mt-2">{{ .Error }}</p>
             </div>
         </div>
         {{template "footer" .}}
