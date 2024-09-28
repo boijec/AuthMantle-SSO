@@ -89,11 +89,11 @@ func CheckRedirectURI(ctx context.Context, connection DbActions, uri string) (bo
 
 // TODO Figure out how to malloc the settings strings without a count query prior to every query
 
-func (rco *RealmCacheObject) GetRealmSettings(ctx context.Context, connection DbActions, realmName string) error {
+func (rco *RealmCacheObject) GetRealmSettings(ctx context.Context, connection DbActions, realmId int) error {
 	realmRow := connection.QueryRow(
 		ctx,
-		"SELECT r.id, r.name FROM authmantledb.realm r WHERE r.name = $1",
-		realmName,
+		"SELECT r.id, r.name FROM authmantledb.realm r WHERE r.id = $1",
+		realmId,
 	)
 	err := realmRow.Scan(
 		&rco.RealmId,

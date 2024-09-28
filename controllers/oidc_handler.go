@@ -42,7 +42,7 @@ func (c *Controller) HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	logger := ctx.Value(middleware.LoggerContextKey).(*slog.Logger)
-	realmName := ctx.Value(middleware.RealmContextKey).(string)
+	realmId := ctx.Value(middleware.RealmIDContextKey).(int)
 	connection, err := c.Db.Acquire(ctx)
 	defer connection.Release()
 	if err != nil {
@@ -52,7 +52,7 @@ func (c *Controller) HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	rs := new(data.RealmCacheObject)
-	err = rs.GetRealmSettings(ctx, connection, realmName)
+	err = rs.GetRealmSettings(ctx, connection, realmId)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error while getting realm settings", "error", err)
 		http.Error(w, "Error while getting realm settings", http.StatusInternalServerError)
@@ -236,9 +236,10 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
 		return
 	}
+	realmId := ctx.Value(middleware.RealmIDContextKey).(int)
 
 	user := new(data.User)
-	err = user.GetUser(ctx, *logger, connection, r.FormValue("username"))
+	err = user.GetUser(ctx, connection, r.FormValue("username"), realmId)
 	if err != nil {
 		logger.Warn("User not found", "username", r.FormValue("username"), "error", err)
 		err = c.Renderer.Render(w, "login.html", Page{

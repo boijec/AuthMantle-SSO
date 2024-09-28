@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	"log/slog"
 	"time"
 )
 
@@ -31,11 +30,12 @@ func (e *UserNotFoundError) Error() string {
 	return "User not found"
 }
 
-func (user *User) GetUser(ctx context.Context, logger slog.Logger, connection DbActions, username string) error {
+func (user *User) GetUser(ctx context.Context, connection DbActions, username string, realmId int) error {
 	row := connection.QueryRow(
 		ctx,
-		"SELECT * FROM authmantledb.user us WHERE us.username = $1",
+		"SELECT us.* FROM authmantledb.user us WHERE us.username = $1 AND us.realm_id = $2",
 		username,
+		realmId,
 	)
 	err := row.Scan(
 		&user.ID,
