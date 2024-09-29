@@ -19,9 +19,7 @@ import (
 // TODO reformat to not have the entire universe in main - rule #1 of the weekend-warrior: don't be horny in main!
 func main() {
 	dbConnection, err := data.InitializePool()
-	defer func() {
-		dbConnection.Close()
-	}()
+	defer dbConnection.Close()
 	if err != nil {
 		slog.Error("Failed to initialize database connection", "error", err)
 		os.Exit(1)
@@ -51,14 +49,17 @@ func main() {
 	controller := controllers.Controller{
 		Db:       &dbConnection,
 		Renderer: &renderer,
+		BaseUrl:  "http://localhost:8443",
 	}
 
 	// ConfiguredRoutes global map of configured routes for OIDC discovery
 	ConfiguredRoutes := map[string]*controllers.EndpointHelper{
-		"jwks":  {"GET", "/{realm}/.well-known/jwks.json", controller.HandleJWKs},
-		"auth":  {"POST", "/{realm}/authorize", controller.HandleAuth},
-		"token": {"POST", "/{realm}/oauth/token.json", controller.HandleNewToken},
+		"JWKsUri":               {"GET", "/{realm}/.well-known/jwks.json", controller.HandleJWKs},
+		"AuthorizationEndpoint": {"POST", "/{realm}/authorize", controller.HandleAuth},
+		"TokenEndpoint":         {"POST", "/{realm}/oauth/token.json", controller.HandleNewToken},
 	}
+
+	controller.Discovery = &ConfiguredRoutes
 
 	openRouter := http.NewServeMux()
 	realmRouter := http.NewServeMux()

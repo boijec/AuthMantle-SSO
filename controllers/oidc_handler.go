@@ -11,7 +11,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"strconv"
+	"strings"
 )
 
 type EndpointHelper struct {
@@ -27,8 +29,10 @@ type AuthRequest struct {
 }
 
 type Controller struct {
-	Db       *data.DatabaseHandler
-	Renderer *utils.Renderer
+	Db        *data.DatabaseHandler
+	Renderer  *utils.Renderer
+	Discovery *map[string]*EndpointHelper
+	BaseUrl   string
 }
 
 func (c *Controller) HandleWellKnown(w http.ResponseWriter, r *http.Request) {
@@ -59,32 +63,24 @@ func (c *Controller) HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 	wk.ResponseTypesSupported = rs.ResponseTypes
 	wk.IdTokenSigningAlgValuesSupported = rs.TokenSigningAlgs
 
+	wk.Issuer = c.BaseUrl
+	for key, value := range *c.Discovery {
+		reflectedPtr := reflect.ValueOf(wk)
+		reflectedField := reflect.Indirect(reflectedPtr).FieldByName(key)
+		reflectedField.Set(reflect.ValueOf(fmt.Sprintf("%s/v1/iodc%s", c.BaseUrl, strings.Replace(value.Endpoint, "{realm}", rs.RealmName, 1))))
+	}
+
 	err = json.NewEncoder(w).Encode(wk)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error while encoding JWKs", "error", err)
 		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	}
-	// TODO implement this tomorrow, too tired to look at this for another weekend, plz god!
-	/*
-		"issuer": "http://localhost:8080",
-		"authorization_endpoint": "http://localhost:8080/v1/authorize",
-		"token_endpoint": "http://localhost:8080/v1/auth/token",
-		"userinfo_endpoint": "http://localhost:8080/protected/userinfo",
-		"end_session_endpoint": "http://localhost:8080/v1/logout",
-		"jwks_uri": "http://localhost:8080/v1/jwks.json",
-		"scopes_supported": ["openid", "profile", "email"],
-		"response_types_supported": ["code"],
-		"grant_types_supported": ["authorization_code"],
-		"subject_types_supported": ["public"],
-		"id_token_signing_alg_values_supported": ["ES256"],
-		"claims_supported": ["sub", "iss", "email", "profile"]
-	*/
 }
 
 func (c *Controller) HandleJWKs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	jwkList := make([]jwk.ECJwk, 1) // TODO remove and actually parse some keys
+	jwkList := make([]jwk.ECJwk, 1)
 	defer func() {
 		jwkList = nil // power to the ppl bby
 	}()
