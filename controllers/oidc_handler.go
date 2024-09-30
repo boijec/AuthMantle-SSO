@@ -6,6 +6,7 @@ import (
 	"authmantle-sso/middleware"
 	"authmantle-sso/utils"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
@@ -67,7 +68,7 @@ func (c *Controller) HandleWellKnown(w http.ResponseWriter, r *http.Request) {
 	for key, value := range *c.Discovery {
 		reflectedPtr := reflect.ValueOf(wk)
 		reflectedField := reflect.Indirect(reflectedPtr).FieldByName(key)
-		reflectedField.Set(reflect.ValueOf(fmt.Sprintf("%s/v1/iodc%s", c.BaseUrl, strings.Replace(value.Endpoint, "{realm}", rs.RealmName, 1))))
+		reflectedField.Set(reflect.ValueOf(fmt.Sprintf("%s/v1/oidc%s", c.BaseUrl, strings.Replace(value.Endpoint, "{realm}", rs.RealmName, 1))))
 	}
 
 	err = json.NewEncoder(w).Encode(wk)
@@ -92,9 +93,11 @@ func (c *Controller) HandleJWKs(w http.ResponseWriter, r *http.Request) {
 	jwkList[0] = jwk.ECJwk{
 		Kty: "EC",
 		Crv: "P-256",
-		X:   fmt.Sprintf("%x", privateKey.X),
-		Y:   fmt.Sprintf("%x", privateKey.Y),
-		D:   fmt.Sprintf("%x", privateKey.D),
+		Alg: "ES256",
+		Kid: "wU3ifIIaLOUAReRB/FG6eM1P1QM=",
+		Use: "sig",
+		X:   strings.TrimRight(base64.URLEncoding.EncodeToString(privateKey.X.Bytes()), "="),
+		Y:   strings.TrimRight(base64.URLEncoding.EncodeToString(privateKey.Y.Bytes()), "="),
 	}
 	j := data.JWKResponse[jwk.ECJwk]{Keys: &jwkList}
 	err = json.NewEncoder(w).Encode(j)
@@ -179,7 +182,10 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	idToken := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-		"foo": "idToken",
+		"sub": 1234567890,
+		"iss": c.BaseUrl,
+		"aud": "https://sso.demorith.com",
+		"iat": 1516239022,
 	})
 	if token, err := idToken.SignedString(privateKey); err != nil {
 		logger.ErrorContext(ctx, "Failed to encode JWKs", "error", err)
@@ -193,7 +199,10 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		res.IdToken = nil
 	}()
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-		"foo": "accessToken",
+		"sub": 1234567890,
+		"iss": c.BaseUrl,
+		"aud": "https://sso.demorith.com",
+		"iat": 1516239022,
 	})
 	if token, err := accessToken.SignedString(privateKey); err != nil {
 		logger.ErrorContext(ctx, "Failed to encode JWKs", "error", err)

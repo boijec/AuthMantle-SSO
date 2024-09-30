@@ -49,7 +49,7 @@ func main() {
 	controller := controllers.Controller{
 		Db:       &dbConnection,
 		Renderer: &renderer,
-		BaseUrl:  "http://localhost:8443",
+		BaseUrl:  "http://authmantle-api:8443",
 	}
 
 	// ConfiguredRoutes global map of configured routes for OIDC discovery
@@ -91,7 +91,7 @@ func main() {
 	router.Handle("/v1/oidc/", http.StripPrefix("/v1/oidc", realmMiddleware(realmRouter)))
 
 	srv := &http.Server{
-		Addr:    "localhost:8443", // TODO export to env
+		Addr:    "0.0.0.0:8443", // TODO export to env
 		Handler: mainMiddleware(router),
 	}
 	sigint := make(chan os.Signal, 1)

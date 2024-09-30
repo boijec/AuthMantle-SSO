@@ -16,7 +16,9 @@ type ECJwk struct {
 	Crv string `json:"crv"`
 	X   string `json:"x"`
 	Y   string `json:"y"`
-	D   string `json:"d"`
+	Alg string `json:"alg"`
+	Kid string `json:"kid"`
+	Use string `json:"use"`
 }
 
 type LoadedKey struct {
