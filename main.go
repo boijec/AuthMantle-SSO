@@ -63,7 +63,6 @@ func main() {
 
 	openRouter := http.NewServeMux()
 	realmRouter := http.NewServeMux()
-	//closedRouter := http.NewServeMux()
 	router := http.NewServeMux()
 
 	router.Handle("/", middleware.GetRoute(controller.GetLandingPage))
@@ -74,18 +73,14 @@ func main() {
 	for _, v := range ConfiguredRoutes {
 		realmRouter.HandleFunc(fmt.Sprintf("%s %s", v.Method, v.Endpoint), v.FunctionPTR)
 	}
-	//openRouter.HandleFunc("GET /.well-known/jwks.json", oidc.HandleJWKs)
-	//openRouter.HandleFunc("POST /authorize", oidc.HandleAuth)
-	//openRouter.HandleFunc("POST /oauth/token.json", oidc.HandleNewToken)
 	// openRouter.HandleFunc("POST /oauth/refresh.json", oidc.HandleRefreshToken)
 	// openRouter.HandleFunc("POST /oauth/revoke.json", oidc.HandleRevocation)
 	// openRouter.HandleFunc("POST /oauth/logout.json", oidc.HandleLogout)
+	// openRouter.HandleFunc("POST /oauth/user-info.json", oidc.HandleUserInfo)
 
 	// UI registration
 	realmRouter.HandleFunc("GET /{realm}/register", controller.GetRegisterPage)
 	realmRouter.HandleFunc("GET /{realm}/authorize", controller.GetLoginPage)
-
-	//closedRouter.HandleFunc("GET /user-info", controller.GetUserSettings)
 
 	router.Handle("/v1/", http.StripPrefix("/v1", openRouter))
 	router.Handle("/v1/oidc/", http.StripPrefix("/v1/oidc", realmMiddleware(realmRouter)))
