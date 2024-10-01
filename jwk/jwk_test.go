@@ -21,23 +21,27 @@ func BenchmarkGetSigningKey(b *testing.B) {
 }
 
 func TestTokenVerification(t *testing.T) {
-	privKey, err := jwk.GetSigningKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var jwkKey jwk.ECJwk
+	var token string
+	{
+		privateKey, err := jwk.GetSigningKey()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	idToken := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-		"sub": 1234567890,
-		"iss": "testing.com",
-		"aud": "https://sso.demorith.com",
-		"iat": 1516239022,
-	})
-	token, err := idToken.SignedString(privKey)
-	if err != nil {
-		t.Fatal("Failed to encode JWKs:", err)
-	}
+		idToken := jwt.NewWithClaims(jwt.SigningMethodES512, jwt.MapClaims{
+			"sub": 1234567890,
+			"iss": "testing.com",
+			"aud": "https://sso.demorith.com",
+			"iat": 1516239022,
+		})
+		token, err = idToken.SignedString(privateKey)
+		if err != nil {
+			t.Fatal("Failed to encode JWKs:", err)
+		}
 
-	jwkKey := jwk.GetEcJWK(privKey)
+		jwkKey = jwk.GetEcJWK(privateKey)
+	}
 	publicKey, err := jwk.GetKeyFromJWK(jwkKey)
 	if err != nil {
 		t.Fatal("Failed to decode JWKs:", err)

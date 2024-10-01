@@ -41,7 +41,7 @@ func loadKey(location string) error {
 	pkey := new(ecdsa.PrivateKey)
 	bytes, err := os.ReadFile(location)
 	if err != nil {
-		pkey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		pkey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 		if err != nil {
 			return err
 		}
@@ -86,8 +86,8 @@ func GetSigningKey() (*ecdsa.PrivateKey, error) {
 func GetEcJWK(key *ecdsa.PrivateKey) ECJwk {
 	return ECJwk{
 		Kty: "EC",
-		Crv: "P-256",
-		Alg: "ES256",
+		Crv: "P-521",
+		Alg: "ES512",
 		Kid: "wU3ifIIaLOUAReRB/FG6eM1P1QM=",
 		Use: "sig",
 		X:   base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(key.X.Bytes()),
@@ -105,7 +105,7 @@ func GetKeyFromJWK(jwk ECJwk) (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 	return &ecdsa.PublicKey{
-		Curve: elliptic.P256(),
+		Curve: elliptic.P521(),
 		X:     new(big.Int).SetBytes(x),
 		Y:     new(big.Int).SetBytes(y),
 	}, nil

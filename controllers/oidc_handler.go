@@ -172,7 +172,7 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idToken := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
+	idToken := jwt.NewWithClaims(jwt.SigningMethodES512, jwt.MapClaims{
 		"sub": 1234567890,
 		"iss": c.BaseUrl,
 		"aud": "https://sso.demorith.com",
@@ -189,7 +189,7 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		res.IdToken = nil
 	}()
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodES512, jwt.MapClaims{
 		"sub": 1234567890,
 		"iss": c.BaseUrl,
 		"aud": "https://sso.demorith.com",

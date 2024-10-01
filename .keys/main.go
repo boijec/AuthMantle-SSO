@@ -15,7 +15,7 @@ func main() {
 		panic("No arguments provided")
 	}
 	fileName := os.Args[1]
-	private, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	private, _ := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	privateBytes, _ := x509.MarshalECPrivateKey(private)
 	f, err := os.Create(fileName)
 	defer f.Close()
