@@ -15,13 +15,13 @@ import (
 )
 
 type ECJwk struct {
+	Kid string `json:"kid"`
+	Alg string `json:"alg"`
+	Use string `json:"use"`
 	Kty string `json:"kty"`
 	Crv string `json:"crv"`
 	X   string `json:"x"`
 	Y   string `json:"y"`
-	Alg string `json:"alg"`
-	Kid string `json:"kid"`
-	Use string `json:"use"`
 }
 
 type LoadedKey struct {
