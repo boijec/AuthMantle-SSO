@@ -7,10 +7,11 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"log"
+	"log/slog"
 	"math/big"
 	"os"
 	"sync"
+	"time"
 )
 
 type ECJwk struct {
@@ -24,8 +25,9 @@ type ECJwk struct {
 }
 
 type LoadedKey struct {
-	lock sync.Mutex
-	key  *ecdsa.PrivateKey
+	lock    sync.Mutex
+	key     *ecdsa.PrivateKey
+	fetched time.Time
 }
 
 var loadedPrivateKey *LoadedKey
@@ -61,7 +63,8 @@ func loadKey(location string) error {
 		return err
 	}
 	loadedPrivateKey.key = pkey
-	log.Println("Loaded private key")
+	slog.Debug("Loading private key")
+	loadedPrivateKey.fetched = time.Now()
 	return nil
 }
 
@@ -72,7 +75,8 @@ If the key has not been loaded, it will load it from the default location
 `.keys/tokenSigner` or create an in-memory key if the file does not exist
 */
 func GetSigningKey() (*ecdsa.PrivateKey, error) {
-	if loadedPrivateKey == nil {
+	if loadedPrivateKey == nil || time.Since(loadedPrivateKey.fetched) > time.Minute {
+		slog.Debug("Loading private key")
 		err := loadKey("./.keys/tokenSigner")
 		if err != nil {
 			return nil, err
@@ -95,6 +99,10 @@ func GetEcJWK(key *ecdsa.PrivateKey) ECJwk {
 	}
 }
 
+/*
+GetKeyFromJWK returns the public key from a JWK
+Currently used for testing the token verification
+*/
 func GetKeyFromJWK(jwk ECJwk) (*ecdsa.PublicKey, error) {
 	x, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(jwk.X)
 	if err != nil {
