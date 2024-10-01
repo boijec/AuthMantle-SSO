@@ -6,7 +6,6 @@ import (
 	"authmantle-sso/middleware"
 	"authmantle-sso/utils"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
@@ -90,15 +89,7 @@ func (c *Controller) HandleJWKs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode JWKs", http.StatusInternalServerError)
 		return
 	}
-	jwkList[0] = jwk.ECJwk{
-		Kty: "EC",
-		Crv: "P-256",
-		Alg: "ES256",
-		Kid: "wU3ifIIaLOUAReRB/FG6eM1P1QM=",
-		Use: "sig",
-		X:   strings.TrimRight(base64.URLEncoding.EncodeToString(privateKey.X.Bytes()), "="),
-		Y:   strings.TrimRight(base64.URLEncoding.EncodeToString(privateKey.Y.Bytes()), "="),
-	}
+	jwkList[0] = jwk.GetEcJWK(privateKey)
 	j := data.JWKResponse[jwk.ECJwk]{Keys: &jwkList}
 	err = json.NewEncoder(w).Encode(j)
 	if err != nil {

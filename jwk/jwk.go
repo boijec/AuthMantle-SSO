@@ -5,8 +5,10 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"log"
+	"math/big"
 	"os"
 	"sync"
 )
@@ -79,4 +81,32 @@ func GetSigningKey() (*ecdsa.PrivateKey, error) {
 	loadedPrivateKey.lock.Lock()
 	defer loadedPrivateKey.lock.Unlock()
 	return loadedPrivateKey.key, nil
+}
+
+func GetEcJWK(key *ecdsa.PrivateKey) ECJwk {
+	return ECJwk{
+		Kty: "EC",
+		Crv: "P-256",
+		Alg: "ES256",
+		Kid: "wU3ifIIaLOUAReRB/FG6eM1P1QM=",
+		Use: "sig",
+		X:   base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(key.X.Bytes()),
+		Y:   base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(key.Y.Bytes()),
+	}
+}
+
+func GetKeyFromJWK(jwk ECJwk) (*ecdsa.PublicKey, error) {
+	x, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(jwk.X)
+	if err != nil {
+		return nil, err
+	}
+	y, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(jwk.Y)
+	if err != nil {
+		return nil, err
+	}
+	return &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     new(big.Int).SetBytes(x),
+		Y:     new(big.Int).SetBytes(y),
+	}, nil
 }
