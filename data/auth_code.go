@@ -18,6 +18,24 @@ type AuthCodeRequest struct {
 	RegisteredBy string    `db:"registered_by"`
 }
 
+type AuthCodeError struct {
+	Reason string
+}
+
+func (e *AuthCodeError) Error() string {
+	return e.Reason
+}
+
+func (arc *AuthCodeRequest) Validate() error {
+	if arc.Consumed == 1 {
+		return &AuthCodeError{"Auth code request has already been consumed"}
+	}
+	if time.Now().After(arc.ValidUntil) {
+		return &AuthCodeError{"Auth code request has expired"}
+	}
+	return nil
+}
+
 func (arc *AuthCodeRequest) CreateAuthCodeRequest(ctx context.Context, connection DbActions, userID int) error {
 	row := connection.QueryRow(
 		ctx,

@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type EndpointHelper struct {
@@ -132,7 +133,7 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	connection, err := c.Db.Acquire(ctx)
 	defer connection.Release()
 	if err != nil {
-		logger.ErrorContext(ctx, "Failed to acquire connection", "error", err)
+		logger.Error("Failed to acquire connection", "error", err)
 		http.Error(w, "Failed to acquire connection", http.StatusInternalServerError)
 		return
 	}
@@ -140,22 +141,27 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	req := new(AuthRequest)
 	err = req.ParseContent(r.Header.Get("Content-Type"), r)
 	if err != nil {
-		logger.ErrorContext(ctx, "Failed to parse request", "error", err)
+		logger.Error("Failed to parse request", "error", err)
 		http.Error(w, "Failed to parse request", http.StatusInternalServerError)
 		return
 	}
 	authCode := new(data.AuthCodeRequest)
 	err = authCode.GetAuthCodeRequest(ctx, connection, req.Code)
 	if err != nil {
-		logger.ErrorContext(ctx, "Failed to get auth code", "error", err)
+		logger.Error("Failed to get auth code", "error", err)
 		http.Error(w, "Failed to get auth code", http.StatusInternalServerError)
+		return
+	}
+	err = authCode.Validate()
+	if err != nil {
+		logger.Warn(err.Error(), "auth_code", req.Code)
+		http.Error(w, "Auth code invalid", http.StatusForbidden)
 		return
 	}
 
 	// rip from-here
 	res := &data.AuthResponse{
-		Scope:     "openid profile email",
-		ExpiresIn: 86400,
+		ExpiresIn: 2400,
 		TokenType: "Bearer",
 	}
 	privateKey, err := jwk.GetSigningKey()
@@ -172,11 +178,33 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	realmId, ok := ctx.Value(middleware.RealmIDContextKey).(int)
+	if ok != true {
+		logger.ErrorContext(ctx, "Failed to get realm id", "error", err)
+		http.Error(w, "Failed to get realm id", http.StatusInternalServerError)
+		return
+	}
+	crs := new(data.RealmCacheObject)
+	err = crs.GetRealmSettings(ctx, connection, realmId)
+	if err != nil {
+		logger.ErrorContext(ctx, "Failed to get realm settings", "error", err)
+		http.Error(w, "Failed to get realm settings", http.StatusInternalServerError)
+		return
+	}
+	for count, scope := range crs.Scopes {
+		if count != len(crs.Scopes)-1 {
+			res.Scope += scope + " "
+		} else {
+			res.Scope += scope
+		}
+	}
+
 	idToken := jwt.NewWithClaims(jwt.SigningMethodES512, jwt.MapClaims{
-		"sub": 1234567890,
 		"iss": c.BaseUrl,
-		"aud": "https://sso.demorith.com",
-		"iat": 1516239022,
+		"sub": authCode.UserID,
+		"aud": crs.Audience,
+		"exp": time.Now().Add(2400 * time.Second).Unix(),
+		"iat": time.Now().Unix(),
 	})
 	if token, err := idToken.SignedString(privateKey); err != nil {
 		logger.ErrorContext(ctx, "Failed to encode JWKs", "error", err)
@@ -190,10 +218,11 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 		res.IdToken = nil
 	}()
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodES512, jwt.MapClaims{
-		"sub": 1234567890,
 		"iss": c.BaseUrl,
-		"aud": "https://sso.demorith.com",
-		"iat": 1516239022,
+		"sub": authCode.UserID,
+		"aud": crs.Audience,
+		"exp": time.Now().Add(2400 * time.Second).Unix(),
+		"iat": time.Now().Unix(),
 	})
 	if token, err := accessToken.SignedString(privateKey); err != nil {
 		logger.ErrorContext(ctx, "Failed to encode JWKs", "error", err)
@@ -206,7 +235,6 @@ func (c *Controller) HandleNewToken(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		res.AccessToken = nil
 	}()
-	// to here
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Status", "200 OK")
