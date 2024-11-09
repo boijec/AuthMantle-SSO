@@ -288,7 +288,10 @@ func (c *Controller) GetLandingPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/error/404", http.StatusSeeOther)
 		return
 	}
-	c.Renderer.Render(r.Context(), w, "authorize.html", "Login")
+	c.Renderer.RenderWithData(r.Context(), w, "index.html", utils.Page{
+		EnableRegistration: false,
+		PageMeta:           utils.MetaData{PageTitle: "Landing"},
+	})
 }
 func (c *Controller) GetRegisterPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
