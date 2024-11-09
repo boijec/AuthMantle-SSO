@@ -6,3 +6,6 @@ tmp/
 !.keys/main.go
 docker-compose-*.yml
 web/static/js/lib/*.min.js
+web/node_modules
+web/static/css/main.css
+.air.toml

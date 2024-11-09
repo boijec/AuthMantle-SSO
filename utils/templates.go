@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 )
 
@@ -27,17 +28,23 @@ type MetaData struct {
 	PageTitle string
 }
 
+func getEnv(key string) string {
+	return os.Getenv(key)
+}
+
 func (t *Renderer) render(w http.ResponseWriter, name string, data interface{}) error {
-	// TODO is this necessary?
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	//t.lock.Lock()
+	//defer t.lock.Unlock()
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
 func InitializeTemplates() (Renderer, error) {
+	tmp := template.New("master_renderer")
+	tmp.Funcs(template.FuncMap{
+		"getEnv": getEnv,
+	})
 	return Renderer{
-		// TODO export to env?
-		templates: template.Must(template.ParseGlob("web/templates/*.html")),
+		templates: template.Must(tmp.ParseGlob("web/templates/*.html")),
 		lock:      sync.Mutex{},
 	}, nil
 }

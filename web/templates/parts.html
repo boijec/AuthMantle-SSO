@@ -13,8 +13,12 @@
 {{ define "head" }}
 <head>
     <title>AuthMantle / {{ .PageMeta.PageTitle }}</title>
+    {{ if eq (getEnv "RUNTIME_ENV") "production" }}
+    <link href="/static/css/main.css" rel="stylesheet">
+    {{ else }}
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@2.0.3" integrity="sha384-Y7hw+L/jvKeWIRRkqWYfPcvVxHzVzn5REgzbawhxAuQGwX1XWe70vji+VSeHOThJ" crossorigin="anonymous"></script>
+    {{ end }}
+    <script src="/static/js/lib/htmx.min.js" integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq"></script>
 </head>
 {{ end }}
 

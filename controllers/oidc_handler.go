@@ -284,7 +284,7 @@ func (c *Controller) HandleAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) GetLandingPage(w http.ResponseWriter, r *http.Request) {
-	if s := r.URL.Path; s != "/" { // make sure that the shit does not effect other pages.
+	if s := r.URL.Path; s != "/" {
 		http.Redirect(w, r, "/error/404", http.StatusSeeOther)
 		return
 	}

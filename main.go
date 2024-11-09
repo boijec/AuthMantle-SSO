@@ -34,6 +34,7 @@ func main() {
 		slog.Error("Failed to initialize templates", "error", err)
 		os.Exit(1)
 	}
+	staticFiles := http.FileServer(http.Dir("web/static"))
 	uuid.EnableRandPool()
 	slog.SetLogLoggerLevel(slog.LevelInfo)
 	mainMiddleware := middleware.RegisterMiddlewares(
@@ -65,6 +66,7 @@ func main() {
 	realmRouter := http.NewServeMux()
 	router := http.NewServeMux()
 
+	router.Handle("/static/", http.StripPrefix("/static/", staticFiles))
 	router.Handle("/", middleware.GetRoute(controller.GetLandingPage))
 	router.Handle("/error/{status}", middleware.GetRoute(controller.ErrorRedirect))
 
