@@ -7,12 +7,12 @@
             <form method="POST" class="flex flex-col justify-between mt-3 space-y-4">
                 {{ $length := len .Error }}
                 <div class="flex flex-col">
-                    <label for="username">Username</label>
-                    <input type="text" name="username" required placeholder="Username" class="py-[10px] px-2 rounded-sm bg-slate-100 {{ if gt $length 0 }}ring ring-red-500{{ end }} " />
+                    <label for="username-field">Username</label>
+                    <input type="text" autocomplete="username" id="username-field" name="username" required placeholder="Username" class="py-[10px] px-2 rounded-sm bg-slate-100 {{ if gt $length 0 }}ring ring-red-500{{ end }} " />
                 </div>
                 <div class="flex flex-col">
-                    <label for="password">Password</label>
-                    <input type="password" name="password" required placeholder="Password" class="py-[10px] px-2 rounded-sm bg-slate-100 {{ if gt $length 0 }}ring ring-red-500{{ end }}" />
+                    <label for="password-field">Password</label>
+                    <input type="password" autocomplete="current-password" id="password-field" name="password" required placeholder="Password" class="py-[10px] px-2 rounded-sm bg-slate-100 {{ if gt $length 0 }}ring ring-red-500{{ end }}" />
                 </div>
                 {{ if gt $length 0 }}
                     <p class="text-red-500 py-2">{{ .Error }}</p>

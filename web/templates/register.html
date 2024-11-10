@@ -6,16 +6,16 @@
             {{ template "pageHeader" . }}
             <form hx-post="/api/hello" class="flex flex-col justify-between mt-3 space-y-4">
                 <div class="flex flex-col">
-                    <label for="username">Username</label>
-                    <input type="text" name="username" placeholder="Username" class="py-[10px] px-2 rounded-sm bg-slate-100" />
+                    <label for="username-field">Username</label>
+                    <input type="text" autocomplete="username" id="username-field" name="username" placeholder="Username" class="py-[10px] px-2 rounded-sm bg-slate-100" />
                 </div>
                 <div class="flex flex-col">
-                    <label for="email">Email</label>
-                    <input type="text" name="email" placeholder="Email" class="py-[10px] px-2 rounded-sm bg-slate-100" />
+                    <label for="email-field">Email</label>
+                    <input type="text" autocomplete="email" id="email-field" name="email" placeholder="Email" class="py-[10px] px-2 rounded-sm bg-slate-100" />
                 </div>
                 <div class="flex flex-col">
                     <label for="country_select">Country</label>
-                    <select name="country" id="country_select" class="py-[10px] px-2 rounded-sm bg-slate-100">
+                    <select autocomplete="country" name="country" id="country_select" class="py-[10px] px-2 rounded-sm bg-slate-100">
                         <option value="">Select Country</option>
                         <!-- loop through an array of country objects from a golang array -->
                         {{ range .Countries }}
@@ -24,16 +24,16 @@
                     </select>
                 </div>
                 <div class="flex flex-col">
-                    <label for="phone">Phone number</label>
-                    <input type="tel" name="phone" placeholder="Phone number" class="py-[10px] px-2 rounded-sm bg-slate-100" />
+                    <label for="phone-field">Phone number</label>
+                    <input type="tel" autocomplete="off" id="phone-field" name="phone" placeholder="Phone number" class="py-[10px] px-2 rounded-sm bg-slate-100" />
                 </div>
                 <div class="flex flex-col">
-                    <label for="password">Password</label>
-                    <input type="password" name="password" placeholder="Password" class="py-[10px] px-2 rounded-sm bg-slate-100" />
+                    <label for="password-field">Password</label>
+                    <input type="password" autocomplete="new-password" id="password-field" name="password" placeholder="Password" class="py-[10px] px-2 rounded-sm bg-slate-100" />
                 </div>
                 <div class="flex flex-col">
-                    <label for="retypePassword">Retype Password</label>
-                    <input type="password" name="retypePassword" placeholder="Password" class="py-[10px] px-2 rounded-sm bg-slate-100" />
+                    <label for="retype-password-field">Retype Password</label>
+                    <input type="password" autocomplete="new-password" id="retype-password-field" name="retypePassword" placeholder="Password" class="py-[10px] px-2 rounded-sm bg-slate-100" />
                 </div>
                 <input type="submit" value="Register" class="mt-5 px-4 py-2 bg-blue-500 text-white rounded-md" />
             </form>
